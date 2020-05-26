@@ -3,7 +3,8 @@ EXE_INC = \
     -I$(LIB_SRC)/parallel/distributed/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
-    -I$(LIB_SRC)/OpenFOAM/lnInclude
+    -I$(LIB_SRC)/OpenFOAM/lnInclude \
+    -I../../src/parallel/distributed/lnInclude
 
 EXE_LIBS = \
     -lmeshTools \
@@ -12,4 +13,5 @@ EXE_LIBS = \
     -lmeshTools \
     -ltriSurface \
     -ldistributed \
-    -lradiationModels
+    -lradiationModels \
+    $(FOAM_USER_LIBBIN)/libdistributedBugFix.so

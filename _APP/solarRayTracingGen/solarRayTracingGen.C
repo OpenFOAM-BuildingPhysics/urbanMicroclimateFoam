@@ -36,7 +36,7 @@ Description
 #include "Time.H"
 #include "volFields.H"
 #include "surfaceFields.H"
-#include "distributedTriSurfaceMesh.H"
+#include "distributedTriSurfaceMeshBugFix.H"
 #include "cyclicAMIPolyPatch.H"
 #include "triSurfaceTools.H"
 #include "mapDistribute.H"
