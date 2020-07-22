@@ -6,3 +6,4 @@ set -x
 wmake solarRayTracingGen
 wmake solarRayTracingGenCyclic
 wmake viewFactorsGenCyclic
+wmake calcLAI

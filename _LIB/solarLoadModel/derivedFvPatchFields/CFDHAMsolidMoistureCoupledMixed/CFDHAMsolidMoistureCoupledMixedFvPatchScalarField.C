@@ -47,8 +47,7 @@ CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    mixedFvPatchScalarField(p, iF),
-    impermeable_("undefined-impermeable")
+    mixedFvPatchScalarField(p, iF)
 {
     this->refValue() = 0.0;
     this->refGrad() = 0.0;
@@ -65,8 +64,7 @@ CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
     const fvPatchFieldMapper& mapper
 )
 :
-    mixedFvPatchScalarField(psf, p, iF, mapper),
-    impermeable_(psf.impermeable_)
+    mixedFvPatchScalarField(psf, p, iF, mapper)
 {}
 
 
@@ -78,8 +76,7 @@ CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
     const dictionary& dict
 )
 :
-    mixedFvPatchScalarField(p, iF),
-    impermeable_(dict.lookupOrDefault<bool>("impermeable", false)) 
+    mixedFvPatchScalarField(p, iF)
 {
     if (!isA<mappedPatchBase>(this->patch().patch()))
     {
@@ -117,8 +114,7 @@ CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    mixedFvPatchScalarField(psf, iF),
-    impermeable_(psf.impermeable_)
+    mixedFvPatchScalarField(psf, iF)
 {}
 
 
@@ -203,7 +199,7 @@ void CFDHAMsolidMoistureCoupledMixedFvPatchScalarField::updateCoeffs()
 
     scalarField gl = ((gcrNbr*rhol)/(3600*1000));
     scalarField g_conv = rhoNbr*(Dm + nutNbr/Sct) * (wcNbr-(0.62198*pv_s/1e5)) *deltaCoeff_; 
-    scalarField g_cond = (Krel+K_v)*fieldpc.snGrad();  
+//    scalarField g_cond = (Krel+K_v)*fieldpc.snGrad();  
     
     // term with temperature gradient:
     scalarField K_pt(pcp.size(), 0.0);
@@ -219,29 +215,24 @@ void CFDHAMsolidMoistureCoupledMixedFvPatchScalarField::updateCoeffs()
     scalarField phiG = Krel*rhol*gn;
     //////////////////////////////////
 
-    if(impermeable_ == false)
+    valueFraction() = 0.0;
+    if(gMax(gl) > 0)
     {
-        valueFraction() = 0.0;
-        if(gMax(gl) > 0)
-        {     
-            forAll(valueFraction(),faceI)
-            {  
-                if(pcp[faceI] > -100.0 && (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + X[faceI]) )    
-                {
-                    valueFraction()[faceI] = 1.0;
-                }
+        scalarField g_cond = (Krel+K_v)*(-10.0-fieldpc.patchInternalField())*patch().deltaCoeffs();        
+        forAll(valueFraction(),faceI)
+        {  
+            //if(pcp[faceI] > -100.0 && (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + X[faceI]) )    
+            if( (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + X[faceI]) )    
+            {
+                valueFraction()[faceI] = 1.0;
             }
         }
-       
-        refGrad() = (g_conv + gl + phiG - X)/(Krel + K_v);
-        refValue() =  -100.0 + 1.0;
     }
-    else 
-    {
-        refGrad() = 0; 
-        refValue() = 0;
-        valueFraction() = 0;        
-    }
+   
+    refGrad() = (g_conv + gl + phiG - X)/(Krel + K_v);
+//    refValue() =  -100.0 + 1.0;
+    refValue() =  -10.0;
+        
 
     mixedFvPatchScalarField::updateCoeffs(); 
 
@@ -257,7 +248,6 @@ void CFDHAMsolidMoistureCoupledMixedFvPatchScalarField::write
 ) const
 {
     mixedFvPatchScalarField::write(os);
-    os.writeKeyword("impermeable")<< impermeable_ << token::END_STATEMENT << nl;  
 }
 
 

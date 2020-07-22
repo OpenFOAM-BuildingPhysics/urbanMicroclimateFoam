@@ -27,13 +27,13 @@ Class
     CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
 
 Description
-    Coupled boundary condition for moisture flux at solid boundaries - ayk
+    Coupled boundary condition for moisture flux at solid boundaries
+    Written by Aytac Kubilay    
 
     Example usage:
         myInterfacePatchName
         {
             type            compressible::CFDHAMsolidMoistureCoupledMixed;
-            impermeable     false; //(or true, default=false);
             value           uniform -1e7;
         }
 
@@ -63,9 +63,6 @@ class CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
     public mixedFvPatchScalarField
 {        
     // Private data
-
-         //- is the patch impermeable?
-        const bool impermeable_;
 
 public:
 

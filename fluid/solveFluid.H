@@ -21,10 +21,14 @@ while ((simpleControlFluid.run(runTime) || fluidIteration <= minFluidIteration) 
             #include "pEqn.H"
             #include "wEqn.H"
         }
-    turb.correct();
+
+        // Solve vegetation energy balance
+        veg.correct(U, thermo.T(), w);
+
+        turb.correct();
     }
 
-    Info << nl; 
+    Info << nl;
     fluidIteration++;
 }
 

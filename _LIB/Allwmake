@@ -8,3 +8,5 @@ wmake $makeType buildingMaterialModel
 wmake $makeType solarLoadModel
 wmake $makeType simpleControlFluid
 wmake $makeType grassModel
+wmake $makeType turbulenceModels
+wmake $makeType vegetationModels

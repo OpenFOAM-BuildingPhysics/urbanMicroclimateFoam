@@ -25,13 +25,8 @@ Class
     Foam::grass::simpleGrass
 
 Description
-    Works well for combustion applications where optical thickness, tau is
-    large, i.e. tau = a*L > 3 (L = distance between objects)
-
-    Assumes
-     - all surfaces are diffuse
-     - tends to over predict radiative fluxes from sources/sinks
-       *** SOURCES NOT CURRENTLY INCLUDED ***
+    Grass model intended for grass surfaces and green roof/facades
+    Written by Aytac Kubilay
 
 SourceFiles
     simpleGrass.C

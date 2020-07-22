@@ -24,7 +24,7 @@ forAll(Materials, MaterialsI)
         Foam::FatalError();
     }
     const labelList& cells = mesh.cellZones()[cellZoneID];
-    const polyBoundaryMesh& patches = mesh.boundaryMesh();
+//    const polyBoundaryMesh& patches = mesh.boundaryMesh();
     boolList zoneCell(mesh.nCells(), false); 
     
 

@@ -25,7 +25,7 @@ Class
     Foam::solarLoad::directAndDiffuse
 
 Description
-    Solar radiation model based on viewFactorModel. - aytac
+    Solar radiation model based on viewFactorModel. - Written by Aytac Kubilay
     The system solved is: C q = b
     where:
             Cij  = deltaij/(1-Aj) - (Aj/(1-Aj))Fij
@@ -53,6 +53,8 @@ SourceFiles
 #include "scalarIOList.H"
 #include "mapDistribute.H"
 #include "volFields.H"
+
+#include "interpolationTable.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -120,8 +122,8 @@ class directAndDiffuse
         //- timestepsInADay
         label timestepsInADay_;    
         
-        //- sunPosVectorLength
-        label sunPosVectorLength_;           
+        //- sunPosVector
+        interpolationTable<vector> sunPosVector;        
 
         //- Iterations Counter
         label iterCounter_;

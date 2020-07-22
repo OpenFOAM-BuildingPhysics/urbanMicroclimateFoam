@@ -11,6 +11,7 @@ PtrList<surfaceScalarField> ghfFluid(fluidRegions.size());
 PtrList<radiation::radiationModel> radiation(fluidRegions.size());
 PtrList<solarLoad::solarLoadModel> solarLoad(fluidRegions.size());
 PtrList<grass::grassModel> grass(fluidRegions.size());
+PtrList<vegetation::vegetationModel> vegetation(fluidRegions.size());
 PtrList<volScalarField> wFluid(fluidRegions.size());
 PtrList<volScalarField> gcrFluid(fluidRegions.size());
 
@@ -31,6 +32,7 @@ PtrList<fv::options> fluidFvOptions(fluidRegions.size());
 // Populate fluid field pointer lists
 forAll(fluidRegions, i)
 {
+
     Info<< "*** Reading fluid mesh thermophysical properties for region "
         << fluidRegions[i].name() << nl << endl;
 
@@ -58,7 +60,31 @@ forAll(fluidRegions, i)
             ),
             thermoFluid[i].rho()
         )
+    ); 
+
+    radiation.set
+    (
+        i,
+        radiation::radiationModel::New(thermoFluid[i].T())
     );
+    
+    solarLoad.set
+    (
+        i,
+        solarLoad::solarLoadModel::New(thermoFluid[i].T())
+    );
+
+    vegetation.set
+    (
+        i,
+        vegetation::vegetationModel::New(thermoFluid[i].T())
+    );  
+
+    grass.set
+    (
+        i,
+        grass::grassModel::New(thermoFluid[i].T())
+    ); 
 
     Info<< "    Adding to UFluid\n" << endl;
     UFluid.set
@@ -253,26 +279,8 @@ forAll(fluidRegions, i)
 
     // Force p_rgh to be consistent with p
     p_rghFluid[i] = thermoFluid[i].p() - rhoFluid[i]*ghFluid[i];
-
+ 
     fluidRegions[i].setFluxRequired(p_rghFluid[i].name());
-
-    radiation.set
-    (
-        i,
-        radiation::radiationModel::New(thermoFluid[i].T())
-    );
-    
-    solarLoad.set
-    (
-        i,
-        solarLoad::solarLoadModel::New(thermoFluid[i].T())
-    );
-
-    grass.set
-    (
-        i,
-        grass::grassModel::New(thermoFluid[i].T())
-    );        
 
     initialMassFluid[i] = fvc::domainIntegrate(rhoFluid[i]).value();
 
@@ -316,14 +324,14 @@ forAll(fluidRegions, i)
         new IOMRFZoneList(fluidRegions[i])
     );
 
+
     Info<< "    Adding fvOptions\n" << endl;
     fluidFvOptions.set
     (
         i,
         new fv::options(fluidRegions[i])
     );
-
-    turbulence[i].validate();
+            
 }
 
 

@@ -10,6 +10,7 @@
      ==
       - fvm::SuSp(Cf*rho*mag(U), U)
       + fvOptions(rho, U)
+      - fvm::SuSp(veg.Cf()*rho*mag(U), U) // vegetation momentum source
     );
     fvVectorMatrix& UEqn = tUEqn.ref();
 

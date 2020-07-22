@@ -31,6 +31,7 @@
     radiation::radiationModel& rad = radiation[i];
     solarLoad::solarLoadModel& sol = solarLoad[i];
     grass::grassModel& gra = grass[i];
+    vegetation::vegetationModel& veg = vegetation[i];
 
     const label pRefCell = pRefCellFluid[i];
     const scalar pRefValue = pRefValueFluid[i];
@@ -40,3 +41,8 @@
     const dimensionedVector& g = gFluid[i];
     const volScalarField& gh = ghFluid[i];
     const surfaceScalarField& ghf = ghfFluid[i];
+
+
+
+
+

@@ -33,6 +33,7 @@ License
 #include "uniformDimensionedFields.H"
 
 #include "hashedWordList.H"
+#include "regionProperties.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -52,8 +53,7 @@ CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
 :
     mixedFvPatchScalarField(p, iF),
     qrNbrName_("undefined-qrNbr"),
-    qsNbrName_("undefined-qsNbr"),
-    impermeable_("undefined-impermeable")
+    qsNbrName_("undefined-qsNbr")
 {
     this->refValue() = 0.0;
     this->refGrad() = 0.0;
@@ -72,8 +72,7 @@ CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
 :
     mixedFvPatchScalarField(psf, p, iF, mapper),
     qrNbrName_(psf.qrNbrName_),
-    qsNbrName_(psf.qsNbrName_),
-    impermeable_(psf.impermeable_)
+    qsNbrName_(psf.qsNbrName_)
 {}
 
 
@@ -87,8 +86,7 @@ CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
 :
     mixedFvPatchScalarField(p, iF),
     qrNbrName_(dict.lookupOrDefault<word>("qrNbr", "none")),
-    qsNbrName_(dict.lookupOrDefault<word>("qsNbr", "none")),
-    impermeable_(dict.lookupOrDefault<bool>("impermeable", false))
+    qsNbrName_(dict.lookupOrDefault<word>("qsNbr", "none"))
 {
     if (!isA<mappedPatchBase>(this->patch().patch()))
     {
@@ -128,8 +126,7 @@ CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
 :
     mixedFvPatchScalarField(psf, iF),
     qrNbrName_(psf.qrNbrName_),
-    qsNbrName_(psf.qsNbrName_),
-    impermeable_(psf.impermeable_)
+    qsNbrName_(psf.qsNbrName_)
 {}
 
 
@@ -278,18 +275,58 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     //////////////////////////////////////////////////////////////////////////
 
     scalarField qrNbr(Tp.size(), 0.0);
-    if (qrNbrName_ != "none")
-    {
-        qrNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
-        mpp.distribute(qrNbr);
-    }
-
     scalarField qsNbr(Tp.size(), 0.0);
-    if (qsNbrName_ != "none")
+
+    //-- Access vegetation region and populate radiation if vegetation exists,
+    //otherwise use radiation from air region --//
+    regionProperties rp(time);
+    const wordList vegNames(rp["vegetation"]);
+
+    if (vegNames.size()>0)
     {
-        qsNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
-        mpp.distribute(qsNbr);
-    }   
+        const word& vegiRegion = "vegetation";
+        const scalar mppVegDistance = 0;
+ 
+        const polyMesh& vegiMesh =
+        	patch().boundaryMesh().mesh().time().lookupObject<polyMesh>(vegiRegion);
+ 
+        const word& nbrPatchName = nbrPatch.name();
+ 
+        const label patchi = vegiMesh.boundaryMesh().findPatchID(nbrPatchName);
+    
+        const fvPatch& vegiNbrPatch =
+            refCast<const fvMesh>(vegiMesh).boundary()[patchi];
+ 
+        const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), mppVegDistance);
+        //const mappedPatchBase& mppVeg =
+        //    refCast<const mappedPatchBase>(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), mppVegDistance);
+ 
+        if (qrNbrName_ != "none")
+        {
+            qrNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
+            mppVeg.distribute(qrNbr);
+        }
+        if (qsNbrName_ != "none")
+        {
+            qsNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
+            mppVeg.distribute(qsNbr);
+        }
+    }
+    else
+    {
+        if (qrNbrName_ != "none")
+        {
+            qrNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
+            mpp.distribute(qrNbr);
+        }
+        if (qsNbrName_ != "none")
+        {
+            qsNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
+            mpp.distribute(qsNbr);
+        }   
+    }
+    //////////////////////////////
+
 
     //-- Grass adjustments --//
     IOdictionary grassProperties
@@ -346,11 +383,13 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     scalarField CR(Tp.size(), 0.0);
     if(gMax(gl) > 0)
     {
-        scalarField g_cond = (Krel+K_v)*fieldpc.snGrad();
+        //scalarField g_cond = (Krel+K_v)*fieldpc.snGrad();
+        scalarField g_cond = (Krel+K_v)*(-10.0-fieldpc.patchInternalField())*patch().deltaCoeffs();       
         forAll(CR,faceI)
         {
             scalar rainFlux = 0;
-            if(pc[faceI] > -100.0 && (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + Xmoist[faceI]) )
+            //if(pc[faceI] > -100.0 && (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + Xmoist[faceI]) )
+            if( (gl[faceI] > g_cond[faceI] - g_conv[faceI] - phiG[faceI] + Xmoist[faceI]) )
             {
                 rainFlux = g_cond[faceI] - g_conv[faceI] - phiG[faceI] + Xmoist[faceI];
             }
@@ -362,17 +401,17 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
         }
     }         
 
-    if(impermeable_ == false)
+    if(fieldpc.type() == "compressible::CFDHAMsolidMoistureCoupledImpermeable")
     {
         valueFraction() = 0;
         refValue() = 0;
-        refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
+        refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
     }
     else
     {
         valueFraction() = 0;
         refValue() = 0;
-        refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
+        refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
     }
 
     mixedFvPatchScalarField::updateCoeffs(); 
@@ -391,7 +430,6 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::write
     mixedFvPatchScalarField::write(os);
     os.writeKeyword("qrNbr")<< qrNbrName_ << token::END_STATEMENT << nl;
     os.writeKeyword("qsNbr")<< qsNbrName_ << token::END_STATEMENT << nl;
-    os.writeKeyword("impermeable")<< impermeable_ << token::END_STATEMENT << nl;
 }
 
 

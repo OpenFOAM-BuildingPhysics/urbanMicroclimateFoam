@@ -27,7 +27,8 @@ Class
     CFDHAMfluidTemperatureCoupledMixedFvPatchScalarField
 
 Description
-    Coupled boundary condition for temperature value at fluid boundaries - ayk
+    Coupled boundary condition for temperature value at fluid boundaries
+    Written by Aytac Kubilay    
 
     Example usage:
         myInterfacePatchName

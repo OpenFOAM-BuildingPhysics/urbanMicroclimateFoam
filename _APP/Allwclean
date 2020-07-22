@@ -6,3 +6,5 @@ set -x
 wclean solarRayTracingGen
 wclean solarRayTracingGenCyclic
 wclean viewFactorsGenCyclic
+wclean calcLAI
+wclean solarRayTracingVegGen

@@ -33,6 +33,8 @@ License
 
 #include "vectorIOList.H"
 
+#include "interpolationTable.H"
+
 using namespace Foam::constant;
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -331,21 +333,14 @@ void Foam::solarLoad::directAndDiffuse::initialise()
             pivotIndices_.setSize(CLU_().m());
         }
     
-        timestepsInADay_ = readLabel(coeffs_.lookup("timestepsInADay"));
+//        timestepsInADay_ = readLabel(coeffs_.lookup("timestepsInADay"));
 
         // Read sunPosVector list
-        vectorIOList sunPosVector
-        (   
-           IOobject
-           (
-                "sunPosVector",
-                mesh_.time().caseConstant(),
-                mesh_,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-           )
-        ); 
-        sunPosVectorLength_ = sunPosVector.size();
+/*        interpolationTable<vector> sunPosVector
+        (
+            mesh_.time().caseConstant()
+            /"sunPosVector"
+        ); */
     }
 }
 
@@ -667,12 +662,37 @@ void Foam::solarLoad::directAndDiffuse::calculate()
 
     if (Pstream::master())
     {
-        Time& time = const_cast<Time&>(mesh_.time());
+        Time& time = const_cast<Time&>(mesh_.time());   
+        // Read sunPosVector list
+        interpolationTable<vector> sunPosVector
+        (
+            mesh_.time().rootPath()
+            /mesh_.time().globalCaseName()
+            /mesh_.time().constant()
+            /"sunPosVector"
+        );            
+        // look for the correct range
+        label lo = 0;
+        label hi = 0;        
+        for (label i = 0; i < sunPosVector.size(); ++i)
+        {
+            if (time.value() >= sunPosVector[i].first())
+            {
+                lo = hi = i;
+            }
+            else
+            {
+                hi = i;
+                break;
+            }   
+        }
+        label timestep = lo;           
+        /*
         label timestep = ceil( (time.value()/time.deltaT().value())-0.5 ); 
         timestep = (timestep * timestepsInADay_) / (86400 / time.deltaT().value()); //e.g. in case you have 10min timesteps in solar radiation data, but solving for hourly timesteps
         timestep = timestep % sunPosVectorLength_;
         Info << "timestep: " << timestep << ", timestepsInADay_: " << timestepsInADay_ << ", sunPosVectorLength_: " << sunPosVectorLength_ << endl;
-        
+        */
         // Variable Albedo
         if (!constAlbedo_) //this is not tested - aytac
         {

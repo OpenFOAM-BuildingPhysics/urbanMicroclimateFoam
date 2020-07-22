@@ -27,7 +27,8 @@ Class
     CFDHAMfluidMoistureCoupledMixedFvPatchScalarField
 
 Description
-    Coupled boundary condition for moisture value at fluid boundaries - ayk
+    Coupled boundary condition for moisture value at fluid boundaries
+    Written by Aytac Kubilay    
 
     Example usage:
         myInterfacePatchName

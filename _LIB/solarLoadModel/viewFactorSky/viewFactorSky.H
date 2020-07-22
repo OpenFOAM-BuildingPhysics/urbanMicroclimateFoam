@@ -25,7 +25,11 @@ Class
     Foam::radiation::viewFactorSky
 
 Description
-    View factor radiation model. The system solved is: C q = b
+    View factor radiation model. 
+    Sky temperature is used for non-wall patches, e.g. side and top boundaries.
+    Written by Aytac Kubilay based on the original viewFactor model.
+    
+    The system solved is: C q = b
     where:
             Cij  = deltaij/Ej - (1/Ej - 1)Fij
             q    = heat flux

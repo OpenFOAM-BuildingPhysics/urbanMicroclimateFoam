@@ -1,10 +1,12 @@
 EXE_INC = \
     -Ifluid \
     -Isolid \
+    -Iveg \
     -I_LIB/solarLoadModel/lnInclude \
     -I_LIB/grassModel/lnInclude \
     -I_LIB/buildingMaterialModel/lnInclude \
     -I_LIB/simpleControlFluid/lnInclude \
+    -I_LIB/vegetationModels/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/cfdTools \
@@ -17,13 +19,15 @@ EXE_INC = \
     -I$(LIB_SRC)/TurbulenceModels/compressible/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
     -I$(LIB_SRC)/regionModels/regionModel/lnInclude \
-    -I$(LIB_SRC)/atmosphericModels/lnInclude
+    -I$(LIB_SRC)/atmosphericModels/lnInclude \
+    -I_LIB/turbulenceModels/lnInclude
 
 EXE_LIBS = \
     $(FOAM_USER_LIBBIN)/libsolarLoad.so \
     $(FOAM_USER_LIBBIN)/libgrassModel.so \
     $(FOAM_USER_LIBBIN)/libbuildingMaterialModel.so \
     $(FOAM_USER_LIBBIN)/libsimpleControlFluid.so \
+    $(FOAM_USER_LIBBIN)/libvegetationModels.so \
     -lfiniteVolume \
     -lcompressibleTransportModels \
     -lfluidThermophysicalModels \
@@ -35,4 +39,5 @@ EXE_LIBS = \
     -lfvOptions \
     -lregionModels \
     -lsampling \
-    -latmosphericModels
+    -latmosphericModels \
+    $(FOAM_USER_LIBBIN)/libporousCompressibleRASModels.so
