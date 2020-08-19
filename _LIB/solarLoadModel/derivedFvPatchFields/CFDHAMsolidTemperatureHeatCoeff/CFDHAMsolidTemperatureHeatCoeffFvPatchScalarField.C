@@ -91,8 +91,8 @@ CFDHAMsolidTemperatureHeatCoeffFvPatchScalarField
     mixedFvPatchScalarField(p, iF),
     qrNbrName_(dict.lookupOrDefault<word>("qrNbr", "none")),
     qsNbrName_(dict.lookupOrDefault<word>("qsNbr", "none")),
-    hcoeff_(dict.lookupOrDefault<scalar>("hcoeff", "none")),
-    Tamb_(dict.lookupOrDefault<word>("Tamb", "none"))
+    hcoeff_(dict.lookupOrDefault<scalar>("hcoeff",0)),
+    Tamb_(dict.lookupOrDefault<fileName>("Tamb", "none"))
 {
     if (!isA<mappedPatchBase>(this->patch().patch()))
     {
@@ -444,6 +444,8 @@ void CFDHAMsolidTemperatureHeatCoeffFvPatchScalarField::write
     mixedFvPatchScalarField::write(os);
     os.writeKeyword("qrNbr")<< qrNbrName_ << token::END_STATEMENT << nl;
     os.writeKeyword("qsNbr")<< qsNbrName_ << token::END_STATEMENT << nl;
+    os.writeKeyword("hcoeff")<< hcoeff_ << token::END_STATEMENT << nl;
+    os.writeKeyword("Tamb")<< Tamb_ << token::END_STATEMENT << nl;
 }
 
 

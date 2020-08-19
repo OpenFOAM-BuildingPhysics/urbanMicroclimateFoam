@@ -76,7 +76,7 @@ class CFDHAMsolidTemperatureHeatCoeffFvPatchScalarField
         const scalar hcoeff_;
         
          //- Path to the file with the reference temperature values
-        const word Tamb_;          	                    
+        const fileName Tamb_;          	                    
                  
 
 public:
