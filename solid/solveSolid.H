@@ -72,9 +72,9 @@
                 scalar maxChangeTs = gMax(mag(Ts.primitiveField()-Ts_n.primitiveField())); 
                 if(maxChangews < PicardTolerancews && maxChangeTs < PicardToleranceTs && nInternalIter>=2) //force at least 1 internal iteration
                 {
-                    pc_n = pc; pc_n.boundaryFieldRef().updateCoeffs();
-                    ws_n = ws; ws_n.boundaryFieldRef().updateCoeffs();
-                    Ts_n = Ts; Ts_n.boundaryFieldRef().updateCoeffs();
+                    pc_n = pc; //pc_n.boundaryFieldRef().updateCoeffs();
+                    ws_n = ws; //ws_n.boundaryFieldRef().updateCoeffs();
+                    Ts_n = Ts; //Ts_n.boundaryFieldRef().updateCoeffs();
                     Info << "Total internal iterations: " << nInternalIter << endl;
                     timeStepDecrease = false;
                     break;
@@ -93,9 +93,9 @@
                 }   
                 else //not converged nor reached the maximum iteration yet, continue
                 {
-                    pc_n = pc; pc_n.boundaryFieldRef().updateCoeffs();
-                    ws_n = ws; ws_n.boundaryFieldRef().updateCoeffs();
-                    Ts_n = Ts; Ts_n.boundaryFieldRef().updateCoeffs();
+                    pc_n = pc; //pc_n.boundaryFieldRef().updateCoeffs();
+                    ws_n = ws; //ws_n.boundaryFieldRef().updateCoeffs();
+                    Ts_n = Ts; //Ts_n.boundaryFieldRef().updateCoeffs();
                     Info << "maxChangews: " << maxChangews << ", maxChangeTs: " << maxChangeTs << endl;
                 }               
             ///////////////////////////////
