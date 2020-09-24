@@ -328,7 +328,7 @@ void interpfvMeshToCartesian
 
     // Define LAD interpolator to arbitrary locations
     dictionary interpolationDict = mesh.schemesDict().subDict("interpolationSchemes"); // Read interpolation scheme
-    autoPtr<interpolation<scalar> > LAD_interpolator = interpolation<scalar>::New(interpolationDict, LAD); // Define interpolator
+//    autoPtr<interpolation<scalar> > LAD_interpolator = interpolation<scalar>::New(interpolationDict, LAD); // Define interpolator
 
     // Define cartesian interpolation grid
     scalar minCellV = gMin(mesh.V()); // Cartesian mesh resolution (determine from minimum cell size)
@@ -631,7 +631,7 @@ int main(int argc, char *argv[])
         /"sunPosVector"
     );
 
-    scalarListIOList LAIList
+/*    scalarListIOList LAIList
     (
         IOobject
         (
@@ -644,8 +644,8 @@ int main(int argc, char *argv[])
         ),
         sunPosVector.size()
     );
-
-    vectorListIOList qrswList
+*/
+/*    vectorListIOList qrswList
     (
         IOobject
         (
@@ -658,7 +658,7 @@ int main(int argc, char *argv[])
         ),
         sunPosVector.size()
     );
-
+*/
     scalarListIOList divqrswList
     (
         IOobject
@@ -819,15 +819,15 @@ int main(int argc, char *argv[])
         // Setup for each sun ray
 
         // Reference
-        scalarList &LAI = LAIList[vectorID];
+//        scalarList &LAI = LAIList[vectorID];
         scalarList &kcLAIboundary = kcLAIboundaryList[vectorID];
-        vectorList &qrsw = qrswList[vectorID];
+//        vectorList &qrsw = qrswList[vectorID];
         scalarList &divqrsw = divqrswList[vectorID];
 
         // Initialize LAI
-        LAI = zeroList_nMeshCells;
+        scalarList LAI = zeroList_nMeshCells;
         kcLAIboundary = zeroList_nCoarseFacesAll;
-        qrsw = zeroListVectors_nMeshCells;
+//        qrsw = zeroListVectors_nMeshCells;
         divqrsw = zeroList_nMeshCells;
 
 
@@ -987,7 +987,7 @@ int main(int argc, char *argv[])
             List<pointIndexHit> pHitListCells(nMeshCells);
 
             // Calculate solar short-wave radiation vector field
-            forAll(qrsw, cellI)
+/*            forAll(qrsw, cellI)
             {
                 point starti = pmeshC[cellI];
                 point endi = calcEndPoint(starti, n2, pminO, pmaxO);
@@ -1005,7 +1005,7 @@ int main(int argc, char *argv[])
                     qrsw[cellI] = -n2*IDN[vectorID].second()*Foam::exp(-kc*LAI[cellI]);
                 }
             }
-
+*/
             // Info << "setting qrsw " << vectorID
             //      << ", It took " << (std::clock()-tstartlocal) / (double)CLOCKS_PER_SEC
             //      << " second(s)."<< endl;
@@ -1214,7 +1214,7 @@ int main(int argc, char *argv[])
             forAll(qrswi, cellI)
             {
                 LAIi[cellI] = LAI[cellI];
-                qrswi[cellI] = qrsw[cellI];
+//                qrswi[cellI] = qrsw[cellI];
                 divqrswi[cellI] = divqrsw[cellI];
             }
             LAIi.correctBoundaryConditions();
@@ -1242,14 +1242,14 @@ int main(int argc, char *argv[])
     }
 
 
-    Info << "\nWriting fields: LAI " << endl;
-    LAIList.write();
+//    Info << "\nWriting fields: LAI " << endl;
+//    LAIList.write();
 
     Info << "\nWriting fields: kcLAI boundary" << endl;
     kcLAIboundaryList.write();
 
-    Info << "\nWriting fields: qrsw" << endl;
-    qrswList.write();
+//    Info << "\nWriting fields: qrsw" << endl;
+//    qrswList.write();
 
     Info << "\nWriting fields: div qrsw" << endl;
     divqrswList.write();
