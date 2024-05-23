@@ -10,15 +10,18 @@ urbanMicroclimateFoam is a multi-region solver consisting of an air subdomain to
 
 The solver is tested for the following OpenFOAM versions:
 
-* OpenFOAM-org (OpenFOAM Foundation) v6
+* OpenFOAM-org (OpenFOAM Foundation) v6, v7, v8
 
 ### Usage
 
-You can compile the solver as follows:
+You can compile the solver for a specific OpenFOAM version by checking out the commit with corresponding tag. For example, for OpenFOAM v8:
 
 	git clone https://gitlab.ethz.ch/openfoam-cbp/solvers/urbanmicroclimatefoam.git
 	cd urbanmicroclimatefoam
+	git checkout tags/of-org_v8.0
 	./Allwmake
+
+See the list of tags for different versions [here](https://gitlab.ethz.ch/openfoam-cbp/solvers/urbanmicroclimatefoam/-/tags)
 	
 ### Documentation
 
