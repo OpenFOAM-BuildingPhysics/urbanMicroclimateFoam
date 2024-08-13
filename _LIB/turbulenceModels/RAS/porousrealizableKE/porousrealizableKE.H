@@ -95,12 +95,13 @@ protected:
             dimensionedScalar betaP_;
             dimensionedScalar betaD_;  
 
+            scalar Cd_;
 
         // Fields
 
             volScalarField k_;
             volScalarField epsilon_;
-            volScalarField Cf_;
+            volScalarField LAD_;
 
 
    // Protected Member Functions
