@@ -22,7 +22,7 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 ################
-Modified based on Lento's libraries for incompressible porousrealizableKE
+Modified based on Lento Manickathan's libraries for incompressible porousrealizableKE
 - 07.02.2017
 ################
 \*---------------------------------------------------------------------------*/
@@ -227,7 +227,7 @@ porousrealizableKE<BasicTurbulenceModel>::porousrealizableKE
             5.1
         )
     ), 
-
+    Cd_(0.2),
     k_
     (
         IOobject
@@ -252,21 +252,34 @@ porousrealizableKE<BasicTurbulenceModel>::porousrealizableKE
         ),
         this->mesh_
     ),
-    Cf_
+    LAD_
     (
         IOobject
         (
-            "Cf",
-            this->runTime_.timeName(),
+            "LAD",
+            "0",//this->runTime_.timeName(),
             this->mesh_,
             IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         this->mesh_
     )
 {
     bound(k_, this->kMin_);
     bound(epsilon_, this->epsilonMin_);
+    
+    IOobject vegIO
+    (
+        "vegetationProperties",
+        this->runTime_.constant(),
+        this->mesh_,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+    word vegModel = IOdictionary(vegIO).lookup("vegetationModel");
+    dictionary vegCoeffs =  IOdictionary(vegIO).subDict(vegModel + "Coeffs");
+    Cd_ = vegCoeffs.lookupOrDefault("Cd", 0.2);
 
     Info << "Defined custom realizableKE model for porous media" << endl;
 
@@ -330,6 +343,8 @@ void porousrealizableKE<BasicTurbulenceModel>::correct()
     volScalarField C1(max(eta/(scalar(5) + eta), scalar(0.43)));
 
     volScalarField G(this->GName(), nut*(tgradU() && dev(twoSymm(tgradU()))));
+    
+    volScalarField Cf_(Cd_*LAD_);
 
     // Update epsilon and G at the wall
     epsilon_.boundaryFieldRef().updateCoeffs();
@@ -347,7 +362,7 @@ void porousrealizableKE<BasicTurbulenceModel>::correct()
             C2_*alpha*rho*epsilon_/(k_ + sqrt(this->nu()*epsilon_)),
             epsilon_
         )
-      + fvm::Sp(alpha*rho*betaP_*C4_*Cf_*pow(mag(U),3)/k_,epsilon_) // is it not more stable if positive term is without fvm::Sp (so that it is not in the diagonal)? - ayk
+      + fvm::Sp(alpha*rho*betaP_*C4_*Cf_*pow(mag(U),3)/k_,epsilon_)
       - fvm::Sp(alpha*rho*betaD_*C5_*Cf_*mag(U),epsilon_)  
       + epsilonSource()
       + fvOptions(alpha, rho, epsilon_)
@@ -372,7 +387,7 @@ void porousrealizableKE<BasicTurbulenceModel>::correct()
         alpha*rho*G
       - fvm::SuSp(2.0/3.0*alpha*rho*divU, k_)
       - fvm::Sp(alpha*rho*epsilon_/k_, k_)
-      + fvm::Sp(alpha*rho*betaP_*Cf_*pow(mag(U),3)/k_, k_) // is it not more stable if positive term is without fvm::Sp (so that it is not in the diagonal)? - ayk
+      + fvm::Sp(alpha*rho*betaP_*Cf_*pow(mag(U),3)/k_, k_)
       - fvm::Sp(alpha*rho*betaD_*Cf_*mag(U), k_) 
       + kSource()
       + fvOptions(alpha, rho, k_)
