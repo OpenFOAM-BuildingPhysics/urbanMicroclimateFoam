@@ -27,6 +27,7 @@ EXE_LIBS = \
     $(FOAM_USER_LIBBIN)/libsimpleControlFluid.so \
     $(FOAM_USER_LIBBIN)/libblendingLayer.so \
     $(FOAM_USER_LIBBIN)/libvegetationModels.so \
+    $(FOAM_USER_LIBBIN)/libporousCompressibleRASModels.so \
     -lfiniteVolume \
     -lthermophysicalTransportModels \
     -lfluidThermophysicalModels \
