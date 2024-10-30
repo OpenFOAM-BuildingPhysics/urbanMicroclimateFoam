@@ -16,12 +16,12 @@ The solver is tested for the following OpenFOAM versions:
 
 You can compile the solver for a specific OpenFOAM version by checking out the commit with corresponding tag. For example, for OpenFOAM v8:
 
-	git clone https://gitlab.ethz.ch/openfoam-cbp/solvers/urbanmicroclimatefoam.git
+	git clone https://github.com/OpenFOAM-BuildingPhysics/urbanMicroclimateFoam.git
 	cd urbanmicroclimatefoam
 	git checkout tags/of-org_v8.0
 	./Allwmake
 
-See the list of tags for different versions [here](https://gitlab.ethz.ch/openfoam-cbp/solvers/urbanmicroclimatefoam/-/tags)
+See the list of tags for different versions [here](https://github.com/OpenFOAM-BuildingPhysics/urbanMicroclimateFoam/tags)
 	
 ### Documentation
 
@@ -29,6 +29,6 @@ Read [urbanMicroclimateFoam wiki](https://gitlab.ethz.ch/openfoam-cbp/solvers/ur
 
 ### Tutorial cases
 
-Tutorial case for the solver can be found [here](https://gitlab.ethz.ch/openfoam-cbp/tutorials/urbanmicroclimatefoam).
+Tutorial case for the solver can be found [here](https://github.com/OpenFOAM-BuildingPhysics/urbanMicroclimateFoam-tutorials).
 
 More information at the Chair of Building Physics: https://carmeliet.ethz.ch
