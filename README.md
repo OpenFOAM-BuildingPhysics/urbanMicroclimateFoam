@@ -17,7 +17,7 @@ The solver is tested for the following OpenFOAM versions:
 You can compile the solver for a specific OpenFOAM version by checking out the commit with corresponding tag. For example, for OpenFOAM v8:
 
 	git clone https://github.com/OpenFOAM-BuildingPhysics/urbanMicroclimateFoam.git
-	cd urbanmicroclimatefoam
+	cd urbanMicroclimateFoam
 	git checkout tags/of-org_v8.0
 	./Allwmake
 
