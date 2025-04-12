@@ -1,5 +1,7 @@
 #include "buildingMaterialModel.H"
 
+labelList cellType(mesh.nCells(), -1);
+
 forAll(Materials, MaterialsI)
 {
     const dictionary& dict = Materials[MaterialsI];
@@ -20,20 +22,26 @@ forAll(Materials, MaterialsI)
     label cellZoneID = mesh.cellZones().findZoneID(cellZoneName);
     if (cellZoneID == -1)
     {
-        Info << "Something is wrong, cannot find at least one of the necessary cellZones! Exiting!" << endl;
-        Foam::FatalError();
+        FatalErrorInFunction
+        << "Something is wrong, cannot find at least one of the necessary material cellZones!"
+        << exit(FatalError);
     }
     const labelList& cells = mesh.cellZones()[cellZoneID];
 //    const polyBoundaryMesh& patches = mesh.boundaryMesh();
-    boolList zoneCell(mesh.nCells(), false); 
-    
 
     forAll(cells, cellsI)
     {
         label celli = cells[cellsI];
-        cellType[celli] = MaterialsI;
-        zoneCell[celli] = true;
-        
+        if (cellType[celli] > -1)
+        {
+            FatalErrorInFunction
+            << "In solid region " << solidRegions[i].name() << ", a cell is assigned to more than one material cellZone!"
+            << exit(FatalError);
+        }
+        else
+        {
+            cellType[celli] = MaterialsI;
+        }
 
         buildingMaterial->update_w_C_cell(pc,ws,Crel,celli);
         buildingMaterial->update_Krel_cell(pc,ws,Krel,celli);
@@ -44,6 +52,13 @@ forAll(Materials, MaterialsI)
         buildingMaterial->update_Kpt_cell(pc,ws,Ts,K_pt,celli);
     }
 }
+if (min(cellType) == -1)
+{
+    FatalErrorInFunction
+    << "In solid region " << solidRegions[i].name() << ", not all cells are assigned to a material cellZone!"
+    << exit(FatalError);
+}
+
 dimensionedScalar minCrel_("minCrel_", dimensionSet(0, -2, 2, 0, 0, 0, 0), minCrel);
 Crel = max(Crel, minCrel_);
 
