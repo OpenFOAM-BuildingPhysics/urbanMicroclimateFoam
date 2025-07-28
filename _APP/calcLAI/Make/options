@@ -10,7 +10,6 @@ EXE_LIBS = \
     -lmeshTools \
     -lfiniteVolume \
     -lOpenFOAM \
-    -lmeshTools \
     -ltriSurface \
     -ldistributed \
     -lradiationModels \

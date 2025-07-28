@@ -29,6 +29,7 @@ EXE_LIBS = \
     $(FOAM_USER_LIBBIN)/libvegetationModels.so \
     $(FOAM_USER_LIBBIN)/libporousCompressibleRASModels.so \
     -lfiniteVolume \
+    -lmeshTools \
     -lthermophysicalTransportModels \
     -lfluidThermophysicalModels \
     -lsolidThermo \
