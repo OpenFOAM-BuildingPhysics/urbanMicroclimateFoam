@@ -26,6 +26,7 @@ License
 #include "mappedLeafTempFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+#include "Tuple2.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -118,24 +119,63 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
     {
         return;
     }
-    
-    this->operator==(this->mappedField());
 
-    const fvMesh& airMesh = db().time().lookupObject<fvMesh>("air");
+    //this->operator==(this->mappedField());
+
+    //The default nearestCell mapping will sometimes map from a cell with Tl = 0
+    //Replaced with the part below based on Foam::meshSearch::findNearestCellLinear function
+    //but we are searching only within the cells where Tl is defined
+
+    const fvMesh& airMesh = this->sampleField().mesh();
     const volScalarField& Tl = airMesh.lookupObject<volScalarField>("Tl");
-    const volScalarField& LAD = airMesh.lookupObject<volScalarField>("LAD");       
-    scalar Tl_avg = gSum(Tl.field()*LAD.field())/gSum(LAD.field());
-    
+
     scalarField& Tp = *this;
-    forAll(Tp, i)
+
+    List<List<point>> vegCellCentres(Pstream::nProcs());
+    List<List<scalar>> vegCellValues(Pstream::nProcs());
+    forAll(Tl.internalField(), cellI)
     {
-        if(Tp[i] < 1.0)
+        if (Tl.internalField()[cellI] > 0)
         {
-            Tp[i] = Tl_avg;
+            vegCellCentres[Pstream::myProcNo()].append(airMesh.cellCentres()[cellI]);
+            vegCellValues[Pstream::myProcNo()].append(Tl.internalField()[cellI]);
         }
     }
-    
-        
+    Pstream::gatherList(vegCellCentres);
+    Pstream::scatterList(vegCellCentres);
+
+    Pstream::gatherList(vegCellValues);
+    Pstream::scatterList(vegCellValues);
+
+    List<Tuple2<scalar, scalar>> nearest(Tp.size());
+    //Tuple2 comprising 0: sqr(distance), 1: value
+
+    forAll(nearest, i)
+    {
+        //initialize
+        nearest[i].first() = great;
+        nearest[i].second() = great;
+
+        //findNearer
+
+        forAll (vegCellCentres, proci)
+        {
+            forAll(vegCellCentres[proci], pointi)
+            {
+                const point& location = this->patch().Cf()[i];
+                scalar distSqr = magSqr(vegCellCentres[proci][pointi] - location);
+
+                if (distSqr < nearest[i].first())
+                {
+                    nearest[i].first() = distSqr;
+                    nearest[i].second() = vegCellValues[proci][pointi];
+                }
+            }
+        }
+
+        //update value
+        Tp[i] = nearest[i].second();
+    }
 
     fixedValueFvPatchScalarField::updateCoeffs();
 }
