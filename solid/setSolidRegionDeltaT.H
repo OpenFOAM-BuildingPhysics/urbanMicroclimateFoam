@@ -62,10 +62,61 @@ else if(timeStepDecrease == true) //time step is decreased
 {
   if (runTime.deltaT().value() - minDeltaT < VSMALL)
   {
-    pc.write();
-    Ts.write();
-    ws.write();
-    Crel.write();
+    volScalarField pc_dump
+    (
+        IOobject
+        (
+            "pc_dump",
+            runTime.timeName(),
+            solidRegions[i],
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pc
+    );
+    pc_dump.write();
+
+    volScalarField Ts_dump
+    (
+        IOobject
+        (
+            "Ts_dump",
+            runTime.timeName(),
+            solidRegions[i],
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        Ts
+    );
+    Ts_dump.write();
+
+    volScalarField ws_dump
+    (
+        IOobject
+        (
+            "ws_dump",
+            runTime.timeName(),
+            solidRegions[i],
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        ws
+    );
+    ws_dump.write();
+
+    volScalarField Crel_dump
+    (
+        IOobject
+        (
+            "Crel_dump",
+            runTime.timeName(),
+            solidRegions[i],
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        Crel
+    );
+    Crel_dump.write();
 
     FatalError
       << "Cannot decrease time step further. Dumping fields and exiting..." 
