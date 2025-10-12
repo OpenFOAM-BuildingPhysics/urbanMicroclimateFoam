@@ -249,7 +249,9 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
 
     fileName rainTempFile
     (
-       "$FOAM_CASE/0/air/rainTemp"
+       nbrMesh.time().rootPath()
+       /nbrMesh.time().globalCaseName()
+       /"0/air/rainTemp"
     );
     scalar rainTemp = 293.15;
     if(isFile(rainTempFile))
@@ -277,7 +279,9 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             "file", 
             fileName
             (
-                "$FOAM_CASE/0/air/Tambient"
+                nbrMesh.time().rootPath()
+                /nbrMesh.time().globalCaseName()
+                /"0/air/Tambient"
             )
         );
         Function1s::TableFile<scalar> Tambient
@@ -291,7 +295,9 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             "file", 
             fileName
             (
-                "$FOAM_CASE/0/air/wambient"
+                nbrMesh.time().rootPath()
+                /nbrMesh.time().globalCaseName()
+                /"0/air/wambient"
             )
         );
         Function1s::TableFile<scalar> wambient

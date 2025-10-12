@@ -425,7 +425,9 @@ void Foam::radiationModels::viewFactorSky::calculate()
         "file", 
         fileName
         (
-            "$FOAM_CASE/0/air/Tambient"
+            mesh_.time().rootPath()
+            /mesh_.time().globalCaseName()
+            /"0/air/Tambient"
         )
     );
     Function1s::TableFile<scalar> Tambient
@@ -436,7 +438,9 @@ void Foam::radiationModels::viewFactorSky::calculate()
     //////////////////////////////////////////////////////////////////////////
     fileName cloudCoverFile
     (
-       "$FOAM_CASE/0/air/cloudCover"
+       mesh_.time().rootPath()
+       /mesh_.time().globalCaseName()
+       /"0/air/cloudCover"
     );
     
     scalar cc = 0; //cloud cover
