@@ -25,7 +25,7 @@ See the list of tags for different versions [here](https://github.com/OpenFOAM-B
 	
 ### Documentation
 
-Read [urbanMicroclimateFoam wiki](https://gitlab.ethz.ch/openfoam-cbp/solvers/urbanmicroclimatefoam/-/wikis/home) for documentation.
+Read [urbanMicroclimateFoam wiki](https://github.com/OpenFOAM-BuildingPhysics/urbanMicroclimateFoam/wiki) for documentation.
 
 ### Tutorial cases
 
