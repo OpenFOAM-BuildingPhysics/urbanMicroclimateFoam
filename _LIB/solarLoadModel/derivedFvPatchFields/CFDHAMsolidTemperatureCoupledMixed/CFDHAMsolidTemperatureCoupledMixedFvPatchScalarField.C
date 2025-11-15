@@ -225,8 +225,8 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     scalarField nutNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("nut");
         mpp.distribute(nutNbr); 
     
-    scalarField q_conv = (muair/Pr + alphatNbr)*cp*(TcNbr-Tp)*deltaCoeff_; 
-            
+    //scalarField q_conv = (muair/Pr + alphatNbr)*cp*(TcNbr-Tp)*deltaCoeff_;
+
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Tp-5.976*log(Tp));
     scalarField pv_s = pvsat_s*exp((pc)/(rhol*Rv*Tp));
     
@@ -467,22 +467,35 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             }
             CR[faceI] = rainFlux * cap_l*(rainTemp - Tref);
         }
-    }         
+    }
 
     if(fieldpc.type() == "compressible::CFDHAMsolidMoistureCoupledImpermeable")
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
+        scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
+        refValue() = TcNbr + (qrNbr + qsNbr) / h_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            lambda_m * patch().deltaCoeffs()
+        );
+        valueFraction() = h_ / (h_ + kappaDeltaCoeffs);
     }
     else
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
+        scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
+        scalarField q_ext = LE + qrNbr + qsNbr + CR + phiGT -X;
+        refValue() = TcNbr + q_ext / h_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            (lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt) * patch().deltaCoeffs()
+        );
+        valueFraction() = h_ / (h_ + kappaDeltaCoeffs);
     }
 
-    mixedFvPatchScalarField::updateCoeffs(); 
+    mixedFvPatchScalarField::updateCoeffs();
 
     // Restore tag
     UPstream::msgType() = oldTag;

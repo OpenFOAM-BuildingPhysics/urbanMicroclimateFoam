@@ -253,9 +253,8 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
         TambValueIO
     );
     scalar TambValue_ = TambValue.value(time.value());
-    scalarField q_conv = hcoeff_*(TambValue_-Tp); 
-    //scalarField q_conv = (muair/Pr + alphatNbr)*cp*(TcNbr-Tp)*deltaCoeff_; 
-            
+    //scalarField q_conv = hcoeff_*(TambValue_-Tp);
+
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Tp-5.976*log(Tp));
     scalarField pv_s = pvsat_s*exp((pc)/(rhol*Rv*Tp));
 
@@ -504,22 +503,33 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
             }
             CR[faceI] = rainFlux * cap_l*(rainTemp - Tref);
         }
-    }         
+    }
 
     if(fieldpc.type() == "compressible::CFDHAMsolidMoistureCoupledImpermeable")
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
+        refValue() = TambValue_ + (qrNbr + qsNbr) / hcoeff_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            lambda_m * patch().deltaCoeffs()
+        );
+        valueFraction() = hcoeff_ / (hcoeff_ + kappaDeltaCoeffs);
     }
     else
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
+        scalarField q_ext = LE + qrNbr + qsNbr + CR + phiGT -X;
+        refValue() = TambValue_ + q_ext / hcoeff_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            (lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt) * patch().deltaCoeffs()
+        );
+        valueFraction() = hcoeff_ / (hcoeff_ + kappaDeltaCoeffs);
     }
 
-    mixedFvPatchScalarField::updateCoeffs(); 
+    mixedFvPatchScalarField::updateCoeffs();
 
     // Restore tag
     UPstream::msgType() = oldTag;
