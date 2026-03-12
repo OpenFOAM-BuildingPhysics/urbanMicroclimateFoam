@@ -16,8 +16,8 @@ forAll(Materials, MaterialsI)
     (
        buildingMaterialModel::New("buildingMaterial", dict, cellZoneModel)
     );
-    
-    label cellZoneID = mesh.cellZones().findZoneID(cellZoneName);
+
+    label cellZoneID = mesh.cellZones().findIndex(cellZoneName);
     if (cellZoneID == -1)
     {
         Info << "Something is wrong, cannot find at least one of the necessary cellZones! Exiting!" << endl;
@@ -25,22 +25,22 @@ forAll(Materials, MaterialsI)
     }
     const labelList& cells = mesh.cellZones()[cellZoneID];
 //    const polyBoundaryMesh& patches = mesh.boundaryMesh();
-    boolList zoneCell(mesh.nCells(), false); 
-    
+    boolList zoneCell(mesh.nCells(), false);
+
 
     forAll(cells, cellsI)
     {
         label celli = cells[cellsI];
         cellType[celli] = MaterialsI;
         zoneCell[celli] = true;
-        
+
 
         buildingMaterial->update_w_C_cell(pc,ws,Crel,celli);
         buildingMaterial->update_Krel_cell(pc,ws,Krel,celli);
         buildingMaterial->update_Kv_cell(pc,ws,Ts,K_v,celli);
-        rho_m.ref()[celli] = rho_;
-        cap_m.ref()[celli] = cap_;
-        lambda_m.ref()[celli] = lambda1_ + lambda2_*ws[celli];
+        rho_m[celli] = rho_;
+        cap_m[celli] = cap_;
+        lambda_m[celli] = lambda1_ + lambda2_*ws[celli];
         buildingMaterial->update_Kpt_cell(pc,ws,Ts,K_pt,celli);
     }
 }

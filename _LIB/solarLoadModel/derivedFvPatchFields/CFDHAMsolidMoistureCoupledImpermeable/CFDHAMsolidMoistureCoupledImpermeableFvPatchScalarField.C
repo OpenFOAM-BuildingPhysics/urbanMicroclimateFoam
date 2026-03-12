@@ -27,7 +27,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-#include "mappedPatchBase.H"
+//#include "mappedPatchBase.H" //v8
+#include "mappedFvPatchBaseBase.H" //v12
 #include "fixedValueFvPatchFields.H"
 #include "uniformDimensionedFields.H"
 
@@ -78,10 +79,11 @@ CFDHAMsolidMoistureCoupledImpermeableFvPatchScalarField
 :
     mixedFvPatchScalarField(p, iF)
 {
-    if (!isA<mappedPatchBase>(this->patch().patch()))
+    //v8: if (!isA<mappedPatchBase>(this->patch().patch()))
+    if (!isA<mappedFvPatchBaseBase>(this->patch()))
     {
         FatalErrorInFunction
-            << "' not type '" << mappedPatchBase::typeName << "'"
+            << "' not type '" << mappedFvPatchBaseBase::typeName << "'"
             << "\n    for patch " << p.name()
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
@@ -135,7 +137,7 @@ void CFDHAMsolidMoistureCoupledImpermeableFvPatchScalarField::updateCoeffs()
     // Get the coupling information from the mappedPatchBase
 /*    const mappedPatchBase& mpp =
         refCast<const mappedPatchBase>(patch().patch());
-    const polyMesh& nbrMesh = mpp.sampleMesh();
+    const polyMesh& nbrMesh = mpp.nbrMesh();
     const label samplePatchI = mpp.samplePolyPatch().index();
     const fvPatch& nbrPatch =
         refCast<const fvMesh>(nbrMesh).boundary()[samplePatchI];

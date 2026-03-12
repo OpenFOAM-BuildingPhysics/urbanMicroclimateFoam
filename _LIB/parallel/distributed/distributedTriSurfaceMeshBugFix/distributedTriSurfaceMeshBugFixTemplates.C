@@ -25,7 +25,7 @@ License
 
 #include "distributedTriSurfaceMeshBugFix.H"
 #include "triSurfaceFields.H"
-#include "mapDistribute.H"
+#include "distributionMap.H"
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -83,7 +83,7 @@ License
 template<class Type>
 void Foam::distributedTriSurfaceMeshBugFix::distributeFields
 (
-    const mapDistribute& map
+    const distributionMap& map
 )
 {
     typedef DimensionedField<Type, triSurfaceGeoMesh> DimensionedSurfField;

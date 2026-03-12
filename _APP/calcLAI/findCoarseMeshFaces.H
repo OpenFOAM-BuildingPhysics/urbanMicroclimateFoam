@@ -5,7 +5,7 @@
       IOobject
       (
           "vegetation",//"radiation",
-          runTime.timeName(),
+          runTime.name(),
           runTime,
           IOobject::MUST_READ
       )
@@ -16,7 +16,7 @@
       IOobject
       (
           "qr",
-          runTime.timeName(),
+          runTime.name(),
           vegMesh,
           IOobject::MUST_READ,
           IOobject::NO_WRITE
@@ -56,7 +56,7 @@
         IOobject
         (
             vegMesh.name(),
-            runTime.timeName(),
+            runTime.name(),
             runTime,
             IOobject::NO_READ,
             IOobject::NO_WRITE

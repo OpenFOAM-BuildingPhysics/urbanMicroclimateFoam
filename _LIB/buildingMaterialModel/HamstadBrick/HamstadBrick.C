@@ -81,8 +81,8 @@ void Foam::buildingMaterialModels::HamstadBrick::update_w_C_cell(const volScalar
         tmp2 = pow( (1 + tmp) , retm[i] );
         C_tmp = C_tmp - retw[i]/tmp2 * retm[i]*retn[i]*tmp/((1 + tmp)*pc.internalField()[celli]);   
     }
-    w.ref()[celli] = w_tmp*157;
-    Crel.ref()[celli] = mag( C_tmp*157 );   
+    w[celli] = w_tmp*157;
+    Crel[celli] = mag( C_tmp*157 );   
 }
 
 //- Correct the buildingMaterial liquid permeability (cell)
@@ -102,7 +102,7 @@ void Foam::buildingMaterialModels::HamstadBrick::update_Krel_cell(const volScala
         dum4=dum4 + retw[i]*reta[i];
     }    
     
-    Krel.ref()[celli] = Ks*(pow( dum2 , tau))*(pow( (dum3/dum4) , 2));
+    Krel[celli] = Ks*(pow( dum2 , tau))*(pow( (dum3/dum4) , 2));
 }
 
 //- Correct the buildingMaterial vapor permeability (cell)
@@ -117,7 +117,7 @@ void Foam::buildingMaterialModels::HamstadBrick::update_Kv_cell(const volScalarF
     scalar tmp = 1 - (w.internalField()[celli]/1.57e2); 
     scalar delta = 2.61e-5 * tmp/(R_v*T.internalField()[celli]*30*(0.503*tmp*tmp + 0.497)); // Water vapour diffusion coefficient "for brick" [s]
     
-    K_v.ref()[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
+    K_v[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
 }
 
 //- Correct the buildingMaterial K_pt (cell)
@@ -135,7 +135,7 @@ void Foam::buildingMaterialModels::HamstadBrick::update_Kpt_cell(const volScalar
     scalar tmp = 1 - (w.internalField()[celli]/1.57e2); 
     scalar delta = 2.61e-5 * tmp/(R_v*T.internalField()[celli]*30*(0.503*tmp*tmp + 0.497)); // Water vapour diffusion coefficient "for brick" [s]
 
-    K_pt.ref()[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) ) * (rho_l*L_v - pc.internalField()[celli]);
+    K_pt[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) ) * (rho_l*L_v - pc.internalField()[celli]);
 }
 
 //*********************************************************** //

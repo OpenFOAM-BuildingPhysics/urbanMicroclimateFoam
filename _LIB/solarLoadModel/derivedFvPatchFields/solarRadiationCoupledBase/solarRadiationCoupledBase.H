@@ -42,6 +42,7 @@ SourceFiles
 #include "scalarField.H"
 #include "NamedEnum.H"
 #include "fvPatch.H"
+#include "fieldMapper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,13 +64,14 @@ public:
         LOOKUP
     };
 
+        //- Names of emissivity methods
+        static const NamedEnum<albedoMethodType, 2>
+            albedoMethodTypeNames_;
+
 
 private:
 
-    // Private data
-
-        static const NamedEnum<albedoMethodType, 2>
-            albedoMethodTypeNames_;
+    // Private Data
 
         //- Underlying patch
         const fvPatch& patch_;
@@ -89,6 +91,10 @@ protected:
 
 public:
 
+     //- Runtime type information
+    TypeName("solarRadiationCoupledBase");
+
+
     // Constructors
 
         //- Construct from patch, albedo mode and albedo
@@ -99,6 +105,15 @@ public:
             const scalarField& albedo
         );
 
+        //- Construct from patch, emissivity mode and emissivity and mapper
+        solarRadiationCoupledBase
+        (
+            const fvPatch& patch,
+            const word& calculationMethod,
+            const scalarField& albedo,
+            const fieldMapper& mapper
+        );
+
         //- Construct from patch and dictionary
         solarRadiationCoupledBase
         (
@@ -107,7 +122,13 @@ public:
         );
 
 
-    // Member functions
+    //- Destructor
+    virtual ~solarRadiationCoupledBase();
+
+
+    // Member Functions
+
+        // Access
 
         //- Method to obtain albedo
         word albedoMethod() const
@@ -116,8 +137,19 @@ public:
         }
 
 
-        //- Calculate corresponding albedo field
-        scalarField albedo() const;
+            //- Calculate corresponding emissivity field
+            tmp<scalarField> albedo() const;
+
+
+        // Mapping functions
+
+            //- Map the given fvPatchField onto this fvPatchField
+            virtual void map(const fvPatchScalarField&, const fieldMapper&);
+
+            //- Reset the fvPatchField to the given fvPatchField
+            //  Used for mesh to mesh mapping
+            virtual void reset(const fvPatchScalarField&);
+
 
         //- Write
         void write(Ostream&) const;

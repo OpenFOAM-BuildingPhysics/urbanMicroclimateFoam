@@ -88,7 +88,7 @@ Foam::tmp<Foam::volScalarField> Foam::solarLoad::noSolarLoad::Rp() const
             IOobject
             (
                 "Rp",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -115,7 +115,7 @@ Foam::solarLoad::noSolarLoad::Ru() const
             IOobject
             (
                 "Ru",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE

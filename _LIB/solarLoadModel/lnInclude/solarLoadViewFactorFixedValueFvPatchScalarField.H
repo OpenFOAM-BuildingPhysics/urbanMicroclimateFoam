@@ -1,0 +1,1 @@
+../derivedFvPatchFields/solarLoadViewFactor/solarLoadViewFactorFixedValueFvPatchScalarField.H

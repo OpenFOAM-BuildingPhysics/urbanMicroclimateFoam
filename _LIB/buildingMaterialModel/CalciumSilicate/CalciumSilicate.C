@@ -75,11 +75,11 @@ void Foam::buildingMaterialModels::CalciumSilicate::update_w_C_cell(const volSca
     scalar rh = Foam::exp(pc.internalField()[celli]/(rhol*Rv*T));
     scalar wcap = 793;
     
-    w.ref()[celli] = wcap*pow( 1-log(rh)/A , (-1/n));
+    w[celli] = wcap*pow( 1-log(rh)/A , (-1/n));
     
     scalar rh2 = Foam::exp((pc.internalField()[celli]+100)/(rhol*Rv*T));
     scalar w2 = wcap*pow( 1-log(rh2)/A , (-1/n));
-    Crel.ref()[celli] = (w2-w.internalField()[celli])/100;   
+    Crel[celli] = (w2-w.internalField()[celli])/100;   
 }
 
 //- Correct the buildingMaterial liquid permeability (cell)
@@ -128,7 +128,7 @@ void Foam::buildingMaterialModels::CalciumSilicate::update_Krel_cell(const volSc
             }
         }
     }
-    Krel.ref()[celli] = pow(10,logKl);
+    Krel[celli] = pow(10,logKl);
 }
 
 //- Correct the buildingMaterial vapor permeability (cell)
@@ -143,7 +143,7 @@ void Foam::buildingMaterialModels::CalciumSilicate::update_Kv_cell(const volScal
     scalar tmp = 1 - (w.internalField()[celli]/793); 
     scalar delta = 2.61e-5 * tmp/(R_v*T.internalField()[celli]*3.8*(0.5*tmp*tmp + 0.5)); // Water vapour diffusion coefficient "for brick" [s]
     
-    K_v.ref()[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
+    K_v[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
 }
 
 //- Correct the buildingMaterial K_pt (cell)
@@ -161,7 +161,7 @@ void Foam::buildingMaterialModels::CalciumSilicate::update_Kpt_cell(const volSca
     scalar tmp = 1 - (w.internalField()[celli]/793); 
     scalar delta = 2.61e-5 * tmp/(R_v*T.internalField()[celli]*3.8*(0.5*tmp*tmp + 0.5)); // Water vapour diffusion coefficient "for brick" [s]
 
-    K_pt.ref()[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) ) * (rho_l*L_v - pc.internalField()[celli]);
+    K_pt[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) ) * (rho_l*L_v - pc.internalField()[celli]);
 }
 
 //*********************************************************** //

@@ -98,34 +98,19 @@ public:
         );
 
         //- Construct by mapping given
-        //  turbulentTemperatureCoupledBaffleMixedFvPatchVectorField onto a
-        //  new patch
         readFieldFvPatchVectorField
         (
             const
             readFieldFvPatchVectorField&,
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
         
-        //- Construct as copy
         readFieldFvPatchVectorField
         (
             const readFieldFvPatchVectorField&
-        );          
-
-        //- Construct and return a clone
-        virtual tmp<fvPatchVectorField> clone() const
-        {
-            return tmp<fvPatchVectorField>
-            (
-                new readFieldFvPatchVectorField
-                (
-                    *this
-                )
-            );
-        }
+        ) = delete;
 
         //- Construct as copy setting internal field reference
         readFieldFvPatchVectorField

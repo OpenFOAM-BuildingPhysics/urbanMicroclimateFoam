@@ -51,7 +51,7 @@ SourceFiles
 #include "globalIndex.H"
 #include "scalarListIOList.H"
 #include "scalarIOList.H"
-#include "mapDistribute.H"
+#include "polyDistributionMap.H"
 #include "volFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -75,7 +75,7 @@ class directAndDiffuse
         labelListIOList finalAgglom_;
 
         //- Map distributed
-        autoPtr<mapDistribute> map_;
+        autoPtr<distributionMap> map_;
 
         //- Coarse mesh
         singleCellFvMesh coarseMesh_;

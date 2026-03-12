@@ -135,10 +135,10 @@ void Foam::buildingMaterialModels::VanGenuchtenVapDiff::update_w_C_cell(const vo
 
    scalar m_ = 1.0 - 1.0/n_;
    scalar tmp = pow(-alpha_*pci, n_);
-   w.ref()[celli] = (wcap_ - wr_)*pow(1+tmp,-m_) + wr_;
+   w[celli] = (wcap_ - wr_)*pow(1+tmp,-m_) + wr_;
    scalar tmp2 = 1+tmp;
 
-   Crel.ref()[celli] = max(mag(-(wcap_-wr_)*m_*n_*alpha_*pow(tmp2,-1-m_)*pow(-alpha_*pci,n_-1)),minCrel_);
+   Crel[celli] = max(mag(-(wcap_-wr_)*m_*n_*alpha_*pow(tmp2,-1-m_)*pow(-alpha_*pci,n_-1)),minCrel_);
 
 }
 
@@ -150,7 +150,7 @@ void Foam::buildingMaterialModels::VanGenuchtenVapDiff::update_Krel_cell(const v
     scalar tmp = (w.internalField()[celli]-wr_)/(wcap_-wr_);
     scalar tmp1 = pow(tmp,1/m_);
     scalar tmp2 = pow(1-tmp1, m_);
-    Krel.ref()[celli] = Ks_*(Foam::sqrt(tmp))*pow(1-tmp2,2);
+    Krel[celli] = Ks_*(Foam::sqrt(tmp))*pow(1-tmp2,2);
 
 }
 
@@ -176,7 +176,7 @@ void Foam::buildingMaterialModels::VanGenuchtenVapDiff::update_Kv_cell(const vol
 
            scalar tmp3 = 1 - ((w.internalField()[celli]-wr_)/(wcap_-wr_));
            scalar delta = 2.61e-5 * tmp3/(R_v*T.internalField()[celli]*muDry_*(A_*tmp3*tmp3 + B_)); // Water vapour diffusion coefficient
-           K_v.ref()[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
+           K_v[celli] = (delta*p_vsat*relhum)/(rho_l*R_v*T.internalField()[celli]);
     }
 
 }
@@ -204,7 +204,7 @@ void Foam::buildingMaterialModels::VanGenuchtenVapDiff::update_Kpt_cell(const vo
 
            scalar tmp3 = 1 - ((w.internalField()[celli]-wr_)/(wcap_-wr_));
            scalar delta = 2.61e-5 * tmp3/(R_v*T.internalField()[celli]*muDry_*(A_*tmp3*tmp3 + B_)); // Water vapour diffusion coefficient
-           K_pt.ref()[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) )*(rho_l*L_v - pc.internalField()[celli]);
+           K_pt[celli] = ( (delta*p_vsat*relhum)/(rho_l*R_v*pow(T.internalField()[celli],2)) )*(rho_l*L_v - pc.internalField()[celli]);
         }
 
 }

@@ -6,7 +6,7 @@
     (
         fvm::ddt(rho,w)
       + fvm::div(phi, w)
-      - fvm::laplacian(rho*Dm + turb.mut()/Sct, w)
+      - fvm::laplacian(rho*Dm + rho*turb.nut()/Sct, w)  // rho*nut() = mut() in v12
       ==
         gra.Sw()
       + veg.Sq() // vegetation energy source term

@@ -30,9 +30,10 @@ License
 #include "addToRunTimeSelectionTable.H"
 
 #include "mixedFvPatchFields.H"
-#include "mappedPatchBase.H"
+//#include "mappedPatchBase.H" //v8
+#include "mappedFvPatchBaseBase.H" //v12
 
-#include "regionProperties.H"
+// regionProperties removed in v12 - use direct mesh lookup instead
 
 using namespace Foam::constant;
 
@@ -75,7 +76,7 @@ void Foam::grass::simpleGrass::initialise()
     label count = 0;
     forAll(grassPatches, i)
     {
-        grassPatchID = mesh_.boundaryMesh().findPatchID(grassPatches[i]);
+        grassPatchID = mesh_.boundaryMesh().findIndex(grassPatches[i]);
         if (grassPatchID < 0)
         {
             FatalErrorInFunction
@@ -112,7 +113,7 @@ Foam::grass::simpleGrass::simpleGrass(const volScalarField& T)
         IOobject
         (
             "Tg",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
@@ -124,7 +125,7 @@ Foam::grass::simpleGrass::simpleGrass(const volScalarField& T)
         IOobject
         (
             "Sw",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -137,7 +138,7 @@ Foam::grass::simpleGrass::simpleGrass(const volScalarField& T)
         IOobject
         (
             "Sh",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -150,7 +151,7 @@ Foam::grass::simpleGrass::simpleGrass(const volScalarField& T)
         IOobject
         (
             "Cf",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -163,10 +164,10 @@ Foam::grass::simpleGrass::simpleGrass(const volScalarField& T)
     initialise();
 
     // read relaxation factor for Tg - aytac
-    dictionary relaxationDict = mesh_.solutionDict().subDict("relaxationFactors");
+    dictionary relaxationDict = mesh_.solution().subDict("relaxationFactors");
     Tg_relax = relaxationDict.lookupOrDefault<scalar>("Tg", 0.5);
 
-    dictionary residualControlDict = mesh_.solutionDict().subDict("SIMPLE").subDict("residualControl");
+    dictionary residualControlDict = mesh_.solution().subDict("SIMPLE").subDict("residualControl");
     Tg_residualControl = residualControlDict.lookupOrDefault<scalar>("Tg", 1e-8);
 }
 
@@ -219,36 +220,50 @@ void Foam::grass::simpleGrass::calculate
         scalarField qs(thisPatch.size(), 0.0);
         //-- Access vegetation region and populate radiation if vegetation exists,
         //otherwise use radiation from air region --//
-        regionProperties rp(mesh_.time());
-        const wordList vegNames(rp["vegetation"]);
-        if (vegNames.size()>0)
+        if (mesh_.time().foundObject<polyMesh>("vegetation"))
         {
-            const word& vegiRegion = "vegetation";
-            const scalar mppVegDistance = 0; 
-               
             const polyMesh& vegiMesh =
-            	thisPatch.boundaryMesh().mesh().time().lookupObject<polyMesh>(vegiRegion);
-     
-            const word& nbrPatchName = thisPatch.name();
+                mesh_.time().lookupObject<polyMesh>("vegetation");
 
-            const label patchi = vegiMesh.boundaryMesh().findPatchID(nbrPatchName);
+            const label vegiPatchID = vegiMesh.boundaryMesh().findIndex(thisPatch.name());
 
-            const fvPatch& vegiNbrPatch =
-                refCast<const fvMesh>(vegiMesh).boundary()[patchi];
+            if (vegiPatchID >= 0)
+            {
+                const fvPatch& vegiNbrPatch =
+                    refCast<const fvMesh>(vegiMesh).boundary()[vegiPatchID];
 
-            // Get the coupling information from the mappedPatchBase
-            const mappedPatchBase& mpp =
-                refCast<const mappedPatchBase>(thisPatch.patch());
+                //v8: if (isA<mappedPatchBase>(thisPatch.patch()))
+                if (isA<mappedFvPatchBaseBase>(thisPatch)) //v12
+                {
+                    //v8: const mappedPatchBase& mpp =
+                    //v8:     refCast<const mappedPatchBase>(thisPatch.patch());
+                    const mappedFvPatchBaseBase& mapper =
+                        mappedFvPatchBaseBase::getMap(thisPatch); //v12
 
-            const mappedPatchBase& mppVeg = mappedPatchBase(thisPatch.patch(), vegiRegion, mpp.mode(), thisPatch.name(), mppVegDistance);
-            //const mappedPatchBase& mppVeg =
-            //    refCast<const mappedPatchBase>(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), mppVegDistance);
-     
-            qs = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
-            mppVeg.distribute(qs);
-
-            qr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
-            mppVeg.distribute(qr);           
+                    // Get fields from vegetation patch and map to this patch
+                    //v8: scalarField qsNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
+                    //v8: qs = mpp.fromNeighbour(qsNbr);
+                    //v8: scalarField qrNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
+                    //v8: qr = mpp.fromNeighbour(qrNbr);
+                    const fvPatch& nbrPatch = mapper.nbrFvPatch(); //v12
+                    qs = mapper.fromNeighbour(
+                        nbrPatch.lookupPatchField<volScalarField, scalar>("qs"))();
+                    qr = mapper.fromNeighbour(
+                        nbrPatch.lookupPatchField<volScalarField, scalar>("qr"))();
+                }
+                else
+                {
+                    // Direct copy for conformal meshes (same patch size assumed)
+                    qs = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
+                    qr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
+                }
+            }
+            else
+            {
+                // Vegetation patch not found, use air region values
+                qs = thisPatch.lookupPatchField<volScalarField, scalar>("qs");
+                qr = thisPatch.lookupPatchField<volScalarField, scalar>("qr");
+            }
         }
         else
         {
@@ -352,7 +367,7 @@ void Foam::grass::simpleGrass::calculate
         /////////////////////////////////////////
 
         ////update fields////////////////////////
-        scalarField& Tg_Internal = Tg_.ref();
+        scalarField& Tg_Internal = Tg_.primitiveFieldRef();
         volScalarField::Boundary& Tg_Bf = Tg_.boundaryFieldRef();
         scalarField& Tg_p = Tg_Bf[patchID];
 
@@ -378,7 +393,7 @@ Foam::tmp<Foam::volScalarField> Foam::grass::simpleGrass::Sh() const
             IOobject
             (
                 "Sh",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -399,7 +414,7 @@ Foam::tmp<Foam::volScalarField> Foam::grass::simpleGrass::Cf() const
             IOobject
             (
                 "Cf",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -421,7 +436,7 @@ Foam::tmp<Foam::volScalarField> Foam::grass::simpleGrass::Sw() const
             IOobject
             (
                 "Sw",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

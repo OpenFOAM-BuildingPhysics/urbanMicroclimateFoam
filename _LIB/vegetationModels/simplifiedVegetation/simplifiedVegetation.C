@@ -30,7 +30,7 @@ Vegetation model implemented by L. Manickathan, Empa, February 2017
 #include "simplifiedVegetation.H"
 #include "addToRunTimeSelectionTable.H"
 
-#include "TableFile.H"
+#include "Table.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -119,7 +119,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "E",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -132,7 +132,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "ev",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -145,7 +145,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "evsat",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -170,7 +170,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "Tl",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
@@ -182,7 +182,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "qsat",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -195,7 +195,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "Qlat",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -208,7 +208,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "Qsen",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -221,7 +221,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "ra",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -234,7 +234,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "rs",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
@@ -247,7 +247,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "rhosat",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -260,7 +260,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "Rg",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -273,7 +273,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "Rn",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -286,7 +286,7 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         IOobject
         (
             "VPD",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -301,10 +301,10 @@ Foam::vegetation::simplifiedVegetation::simplifiedVegetation
         Info << " Defined simplifiedVegetation model" << endl;
         
         // read relaxation factor for Tl - aytac
-        dictionary relaxationDict = mesh_.solutionDict().subDict("relaxationFactors");
+        dictionary relaxationDict = mesh_.solution().subDict("relaxationFactors");
         Tl_relax = relaxationDict.lookupOrDefault<scalar>("Tl", 0.5);     
         
-        dictionary residualControlDict = mesh_.solutionDict().subDict("SIMPLE").subDict("residualControl");
+        dictionary residualControlDict = mesh_.solution().subDict("SIMPLE").subDict("residualControl");
         Tl_residualControl = residualControlDict.lookupOrDefault<scalar>("Tl", 1e-8);
     }
 
@@ -320,13 +320,13 @@ Foam::vegetation::simplifiedVegetation::~simplifiedVegetation()
 void Foam::vegetation::simplifiedVegetation::radiation()
 {
     const fvMesh& vegiMesh = mesh_.time().lookupObject<fvMesh>("vegetation");
-    const label patchi = vegiMesh.boundaryMesh().findPatchID("air_to_vegetation");
+    const label patchi = vegiMesh.boundaryMesh().findIndex("air_to_vegetation");
     const fvPatch& vegiPatch = vegiMesh.boundary()[patchi];
 
     scalarField vegiPatchQr = vegiPatch.lookupPatchField<volScalarField, scalar>("qr");
     scalar integrateQr = gSum(vegiPatch.magSf() * vegiPatchQr);
 
-    scalar vegiVolume = gSum(pos(LAD_.primitiveField() - 10*SMALL)*mesh_.V().field());
+    scalar vegiVolume = gSum(pos(LAD_.primitiveField() - 10*SMALL)*mesh_.V());
 
 //    label timestepsInADay_ = divqrsw.size(); //readLabel(coeffs_.lookup("timestepsInADay"));
     Time& time = const_cast<Time&>(mesh_.time());
@@ -340,9 +340,11 @@ void Foam::vegetation::simplifiedVegetation::radiation()
             /"sunPosVector"
         )
     );
-    Function1s::TableFile<vector> sunPosVector
+    Function1s::Table<vector> sunPosVector
     (
         "sunPosVector",
+        dimTime,
+        dimless,
         sunPosVectorIO
     );
     // look for the correct range    
@@ -616,7 +618,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::simplifiedVegetation::Sh() con
             IOobject
             (
                 "Sh",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -637,7 +639,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::simplifiedVegetation::Cf() con
             IOobject
             (
                 "Cf",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -659,7 +661,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::simplifiedVegetation::Sq() con
             IOobject
             (
                 "Sq",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

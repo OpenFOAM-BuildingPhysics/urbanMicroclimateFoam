@@ -1,11 +1,11 @@
-    const wordList fluidNames(rp["fluid"]);
+    // fluidNames is defined in urbanMicroclimateFoam.C from controlDict regions dictionary
 
     PtrList<fvMesh> fluidRegions(fluidNames.size());
 
     forAll(fluidNames, i)
     {
         Info<< "Create fluid mesh for region " << fluidNames[i]
-            << " for time = " << runTime.timeName() << nl << endl;
+            << " for time = " << runTime.name() << nl << endl;
 
         fluidRegions.set
         (
@@ -15,7 +15,7 @@
                 IOobject
                 (
                     fluidNames[i],
-                    runTime.timeName(),
+                    runTime.name(),
                     runTime,
                     IOobject::MUST_READ
                 )

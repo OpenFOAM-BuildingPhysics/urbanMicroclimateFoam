@@ -3,5 +3,4 @@ cd ${0%/*} || exit 1    # run from this directory
 
 _LIB/Allwmake $*
 _APP/Allwmake $*
-
 wmake

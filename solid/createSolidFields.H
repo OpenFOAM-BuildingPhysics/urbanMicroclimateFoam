@@ -42,7 +42,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "rho_m",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -62,7 +62,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "cap_m",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -82,7 +82,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "lambda_m",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -102,7 +102,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "Ts",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
@@ -120,7 +120,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "ws",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
@@ -138,7 +138,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "pc",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
@@ -156,7 +156,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "Krel",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -176,7 +176,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "K_v",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -196,7 +196,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "K_pt",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -216,7 +216,7 @@ forAll(solidRegions, i)
             IOobject
             (
                 "Crel",
-                runTime.timeName(),
+                runTime.name(),
                 solidRegions[i],
                 IOobject::NO_READ,
                 IOobject::NO_WRITE

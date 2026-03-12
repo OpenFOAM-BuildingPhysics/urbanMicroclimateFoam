@@ -12,13 +12,18 @@ while ((simpleControlFluid.run(runTime) || runTime.timeIndex() <= minFluidIterat
     {
         p_rgh.storePrevIter();
         rho.storePrevIter();
+
+        //v12: predict before equations (updates alphat = rho*nut/Prt)
+        turb.predict();
+        fluidThermophys.predict();
+
         {
             #include "UEqn.H"
             #include "EEqn.H"
             #include "pEqn.H"
             #include "wEqn.H"
         }
-        
+
         gra.correct(thermo.T(), w, U);
 
         // Solve vegetation energy balance

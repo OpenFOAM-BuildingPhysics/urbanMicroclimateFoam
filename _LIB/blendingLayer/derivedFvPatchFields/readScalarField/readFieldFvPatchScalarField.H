@@ -97,37 +97,22 @@ public:
             const dictionary&
         );
 
-        //- Construct by mapping given
-        //  turbulentTemperatureCoupledBaffleMixedFvPatchScalarField onto a
-        //  new patch
+        //- Construct by mapping given readFieldFvPatchScalarField onto a new patch
         readFieldFvPatchScalarField
         (
-            const
-            readFieldFvPatchScalarField&,
+            const readFieldFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
-        
-        //- Construct as copy
+
+        //- Disallow copy without setting internal field reference
         readFieldFvPatchScalarField
         (
             const readFieldFvPatchScalarField&
-        );          
+        ) = delete;
 
-        //- Construct and return a clone
-        virtual tmp<fvPatchScalarField> clone() const
-        {
-            return tmp<fvPatchScalarField>
-            (
-                new readFieldFvPatchScalarField
-                (
-                    *this
-                )
-            );
-        }
-
-        //- Construct as copy setting internal field reference
+        //- Copy constructor setting internal field reference
         readFieldFvPatchScalarField
         (
             const readFieldFvPatchScalarField&,

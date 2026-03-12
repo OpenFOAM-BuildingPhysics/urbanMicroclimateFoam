@@ -17,7 +17,7 @@
       + sol.Sh(thermo, he)
       + gra.Sh()
       + veg.Sh() // vegetation energy source term
-      + fvOptions(rho, he)
+      + fvModels.source(rho, he)
     );
 
     if (blending)
@@ -27,11 +27,11 @@
 
     EEqn.relax();
 
-    fvOptions.constrain(EEqn);
+    fvConstraints.constrain(EEqn);
 
     EEqn.solve();
 
-    fvOptions.correct(he);
+    fvConstraints.constrain(he);
 
     thermo.correct();
 

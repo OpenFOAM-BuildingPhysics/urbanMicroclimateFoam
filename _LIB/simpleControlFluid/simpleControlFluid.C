@@ -33,6 +33,15 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
+
+bool Foam::simpleControlFluid::read()
+{
+    return
+        fluidSolutionControl::read()
+     && singleRegionConvergenceControl::read();
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::simpleControlFluid::simpleControlFluid(fvMesh& mesh, const word& algorithmName)
@@ -57,12 +66,6 @@ Foam::simpleControlFluid::~simpleControlFluid()
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-bool Foam::simpleControlFluid::read()
-{
-    return fluidSolutionControl::read() && readResidualControls();
-}
-
-
 bool Foam::simpleControlFluid::run(Time& time)
 {
     read();
@@ -73,7 +76,9 @@ bool Foam::simpleControlFluid::run(Time& time)
     {
         scalar timeValue = time.value();
         label timeIndex = time.timeIndex();
-        if (criteriaSatisfied())
+        const convergenceData cd(criteriaSatisfied());
+
+        if (cd.checked && cd.satisfied)
         {
             time.setTime(timeValue,timeIndex+1); //iteration counter needs to continue in case minFluidIteration is not yet reached
             return false;
@@ -95,6 +100,16 @@ bool Foam::simpleControlFluid::run(Time& time)
     }
 
     return true;
+}
+
+bool Foam::simpleControlFluid::loop(Time& time)
+{
+    if (!endIfConverged(time))
+    {
+        storePrevIterFields();
+    }
+
+    return time.loop();
 }
 
 // ************************************************************************* //

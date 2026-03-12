@@ -1,0 +1,3 @@
+SOURCE += solarRayTracingGen.C
+
+EXE = $(FOAM_USER_APPBIN)/solarRayTracingGen

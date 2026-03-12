@@ -45,7 +45,7 @@ Foam::grass::grassModel::New
     );
 
     word modelType("none");
-    if (grassIO.typeHeaderOk<IOdictionary>(true))
+    if (grassIO.headerOk())
     {
         IOdictionary(grassIO).lookup("grassModel") >> modelType;
     }
@@ -62,10 +62,8 @@ Foam::grass::grassModel::New
 
     if (cstrIter == TConstructorTablePtr_->end())
     {
-        FatalErrorIn
-        (
-            "grassModel::New(const volScalarField&)"
-        )   << "Unknown grassModel type "
+        FatalErrorInFunction
+            << "Unknown grassModel type "
             << modelType << nl << nl
             << "Valid grassModel types are:" << nl
             << TConstructorTablePtr_->sortedToc()

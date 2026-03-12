@@ -83,7 +83,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::noVegetation::Sh() const
             IOobject
             (
                 "Sh",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -109,7 +109,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::noVegetation::Cf() const
             IOobject
             (
                 "Cf",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -135,7 +135,7 @@ Foam::tmp<Foam::volScalarField> Foam::vegetation::noVegetation::Sq() const
             IOobject
             (
                 "Sq",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

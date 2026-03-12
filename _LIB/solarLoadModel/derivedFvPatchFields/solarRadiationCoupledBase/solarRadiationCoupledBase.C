@@ -25,15 +25,18 @@ License
 
 #include "solarRadiationCoupledBase.H"
 #include "volFields.H"
-#include "mappedPatchBase.H"
-#include "fvPatchFieldMapper.H"
+#include "fieldMapper.H"
+#include "mappedFvPatchBaseBase.H"
 #include "radiationModel.H"
+#include "opaqueSolid.H"
 #include "absorptionEmissionModel.H"
 
 // * * * * * * * * * * * * * Static Member Data  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+    defineTypeNameAndDebug(solarRadiationCoupledBase, 0);
+
     template<>
     const char* Foam::NamedEnum
     <
@@ -65,6 +68,18 @@ Foam::solarRadiationCoupledBase::solarRadiationCoupledBase
     albedo_(albedo)
 {}
 
+Foam::solarRadiationCoupledBase::solarRadiationCoupledBase
+(
+    const fvPatch& patch,
+    const word& calculationType,
+    const scalarField& albedo,
+    const fieldMapper& mapper
+)
+:
+    patch_(patch),
+    method_(albedoMethodTypeNames_[calculationType]),
+    albedo_(mapper(albedo))
+{}
 
 Foam::solarRadiationCoupledBase::solarRadiationCoupledBase
 (
@@ -79,16 +94,16 @@ Foam::solarRadiationCoupledBase::solarRadiationCoupledBase
     {
         case SOLIDRADIATION:
         {
-            if (!isA<mappedPatchBase>(patch_.patch()))
-            {
-                FatalIOErrorInFunction
-                (
-                    dict
-                )   << "\n    patch type '" << patch_.type()
-                    << "' not type '" << mappedPatchBase::typeName << "'"
-                    << "\n    for patch " << patch_.name()
-                    << exit(FatalIOError);
-            }
+            // if (!isA<mappedPatchBase>(patch_.patch()))
+            // {
+            //     FatalIOErrorInFunction
+            //     (
+            //         dict
+            //     )   << "\n    patch type '" << patch_.type()
+            //         << "' not type '" << mappedPatchBase::typeName << "'"
+            //         << "\n    for patch " << patch_.name()
+            //         << exit(FatalIOError);
+            // }
 
             albedo_ = scalarField(patch_.size(), 0.0);
         }
@@ -107,52 +122,50 @@ Foam::solarRadiationCoupledBase::solarRadiationCoupledBase
             }
             else
             {
-                albedo_ = scalarField("albedo", dict, patch_.size());
+                albedo_ = scalarField("albedo", unitFraction,dict, patch_.size());
             }
         }
         break;
     }
 }
 
+// * * * * * * * * * * * * * * * * Destructor    * * * * * * * * * * * * * * //
+
+Foam::solarRadiationCoupledBase::~solarRadiationCoupledBase()
+{}
+
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::scalarField Foam::solarRadiationCoupledBase::albedo() const
+Foam::tmp<Foam::scalarField> Foam::solarRadiationCoupledBase::albedo() const
 {
     switch (method_)
     {
         case SOLIDRADIATION:
         {
-            // Get the coupling information from the mappedPatchBase
-            const mappedPatchBase& mpp =
-                refCast<const mappedPatchBase>(patch_.patch());
+            // Get the mapper and the neighbouring mesh and patch
+            const mappedFvPatchBaseBase& mapper =
+                mappedFvPatchBaseBase::getMap(patch_);
+            const fvMesh& nbrMesh = mapper.nbrMesh();
+            const fvPatch& nbrPatch = mapper.nbrFvPatch();
 
-            const polyMesh& nbrMesh = mpp.sampleMesh();
-
-            const radiationModel& radiation =
-                nbrMesh.lookupObject<radiationModel>
+            const radiationModels::opaqueSolid& radiation =
+                nbrMesh.lookupObject<radiationModels::opaqueSolid>
                 (
                     "radiationProperties"
                 );
 
-
-            const fvMesh& nbrFvMesh = refCast<const fvMesh>(nbrMesh);
-
-            const fvPatch& nbrPatch =
-                nbrFvMesh.boundary()[mpp.samplePolyPatch().index()];
-
-
-            scalarField albedo
+            // NOTE: for an opaqueSolid the absorptionEmission model returns the
+            // emissivity of the surface rather than the emission coefficient
+            // and the input specification MUST correspond to this.
+            return
+                mapper.fromNeighbour
             (
                 radiation.absorptionEmission().e()().boundaryField()
                 [
                     nbrPatch.index()
                 ]
             );
-            mpp.distribute(albedo);
-
-            return albedo;
-
         }
         break;
 
@@ -174,6 +187,31 @@ Foam::scalarField Foam::solarRadiationCoupledBase::albedo() const
     }
 
     return scalarField(0);
+}
+
+
+void Foam::solarRadiationCoupledBase::map
+(
+    const fvPatchScalarField& ptf,
+    const fieldMapper& mapper
+)
+{
+    const solarRadiationCoupledBase& mrptf =
+        refCast<const solarRadiationCoupledBase>(ptf);
+
+    mapper(albedo_, mrptf.albedo_);
+}
+
+
+void Foam::solarRadiationCoupledBase::reset
+(
+    const fvPatchScalarField& ptf
+)
+{
+    const solarRadiationCoupledBase& mrptf =
+        refCast<const solarRadiationCoupledBase>(ptf);
+
+    albedo_.reset(mrptf.albedo_);
 }
 
 

@@ -31,7 +31,7 @@ forAll(patches, patchi)
     if 
     (
         !pp.coupled() 
-     && !isA<cyclicAMIPolyPatch>(pp)
+     && !isA<cyclicTransform>(pp)
      && !isA<emptyPolyPatch>(pp)
     )
     {

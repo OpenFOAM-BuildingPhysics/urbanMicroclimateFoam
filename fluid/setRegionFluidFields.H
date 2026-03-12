@@ -1,22 +1,23 @@
-    const fvMesh& mesh = fluidRegions[i];
+    fvMesh& mesh = fluidRegions[i];
 
-    rhoThermo& thermo = thermoFluid[i];
+    fluidThermo& thermo = thermoFluid[i];
     thermo.validate(args.executable(), "h", "e");
 
     volScalarField& rho = rhoFluid[i];
     volVectorField& U = UFluid[i];
-    volScalarField& w = wFluid[i];    
-    volScalarField& gcr = gcrFluid[i];  
-    surfaceScalarField& phi = phiFluid[i]; 
+    volScalarField& w = wFluid[i];
+    volScalarField& gcr = gcrFluid[i];
+    surfaceScalarField& phi = phiFluid[i];
 
     compressible::momentumTransportModel& turb = turbulence[i];
-    fluidThermophysicalTransportModel& fluidThermophys = fluidThermophysicalTransport[i];
+    fluidThermoThermophysicalTransportModel& fluidThermophys = fluidThermophysicalTransport[i];
 
     volScalarField& p = thermo.p();
     const volScalarField& psi = thermo.psi();
 
     IOMRFZoneList& MRF = MRFfluid[i];
-    fv::options& fvOptions = fluidFvOptions[i];
+    Foam::fvModels& fvModels = Foam::fvModels::New(mesh);
+    Foam::fvConstraints& fvConstraints = Foam::fvConstraints::New(mesh);
 
     const dimensionedScalar initialMass
     (
@@ -24,8 +25,8 @@
         dimMass,
         initialMassFluid[i]
     );
-    
-    pressureControl& pControl = pressureControlFluid[i];
+
+    pressureReference& pRef = pressureReferenceFluid[i];
 
     radiationModel& rad = radiation[i];
     solarLoad::solarLoadModel& sol = solarLoad[i];
@@ -33,6 +34,8 @@
     vegetation::vegetationModel& veg = vegetation[i];
 
     volScalarField& p_rgh = p_rghFluid[i];
+
+    volVectorField& netForce = netForceFluid[i];
 
     const dimensionedVector& g = gFluid[i];
     const volScalarField& gh = ghFluid[i];

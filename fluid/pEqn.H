@@ -1,29 +1,34 @@
 {
     rho = thermo.rho();
+    rho.relax();
 
     volScalarField rAU("rAU", 1.0/UEqn.A());
     surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(rho*rAU));
     volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p_rgh));
-    
+
     tUEqn.clear();
-    
+
     surfaceScalarField phiHbyA
     (
         "phiHbyA",
         fvc::interpolate(rho)*fvc::flux(HbyA)
     );
-    
+
     MRF.makeRelative(fvc::interpolate(rho), phiHbyA);
-    
+
     bool closedVolume = adjustPhi(phiHbyA, U, p_rgh);
 
-    surfaceScalarField phig(-rhorAUf*ghf*fvc::snGrad(rho)*mesh.magSf());
+    // Buoyancy flux (kept separate for reuse in velocity correction)
+    const surfaceScalarField ghGradRhof
+    (
+        -ghf*fvc::snGrad(rho)*mesh.magSf()
+    );
 
-    phiHbyA += phig;
+    phiHbyA += rhorAUf*ghGradRhof;
 
     // Update the pressure BCs to ensure flux consistency
     constrainPressure(p_rgh, rho, U, phiHbyA, rhorAUf, MRF);
-    
+
     fvScalarMatrix p_rghEqn(p_rgh, dimMass/dimTime);
 
     // Solve pressure
@@ -33,33 +38,36 @@
             fvc::div(phiHbyA)
           - fvm::laplacian(rhorAUf, p_rgh)
           ==
-            fvOptions(psi, p_rgh, rho.name());
-            
+            fvModels.source(psi, p_rgh);
+
         p_rghEqn.setReference
         (
-            pControl.refCell(),
-            pControl.refValue()
+            pRef.refCell(),
+            pRef.refValue()
         );
+
+        fvConstraints.constrain(p_rghEqn);
 
         p_rghEqn.solve();
     }
-    
+
     phi = phiHbyA + p_rghEqn.flux();
+
+    // Calculate and relax the net pressure-buoyancy force
+    netForce.relax
+    (
+        fvc::reconstruct(ghGradRhof + p_rghEqn.flux()/rhorAUf),
+        p_rgh.relaxationFactor()
+    );
+
+    // Correct the momentum source with the relaxed net force
+    U = HbyA + rAU*netForce;
+    U.correctBoundaryConditions();
+    fvConstraints.constrain(U);
 
     p = p_rgh + rho*gh;
 
-    #include "incompressible/continuityErrs.H"
-    
-    // Explicitly relax pressure for momentum corrector
-    p_rgh.relax();
-    
-    // Correct the momentum source with the pressure gradient flux
-    // calculated from the relaxed pressure
-    U = HbyA + rAU*fvc::reconstruct((phig + p_rghEqn.flux())/rhorAUf);
-    U.correctBoundaryConditions();
-    fvOptions.correct(U);
-    
-    pControl.limit(p);
+    #include "continuityErrs.H"
 
     // For closed-volume cases adjust the pressure level
     // to obey overall mass continuity
@@ -71,8 +79,9 @@
         p.correctBoundaryConditions();
     }
 
+    // Optionally relax pressure for the thermophysics
+    p.relax(); //v12
+
     rho = thermo.rho();
-
     rho.relax();
-
 }

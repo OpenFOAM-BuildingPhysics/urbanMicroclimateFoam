@@ -24,6 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "vegetationModel.H"
+#include "volFields.H"
 #include "fvmSup.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -54,7 +55,7 @@ Foam::IOobject Foam::vegetation::vegetationModel::createIOobject
         IOobject::NO_WRITE
     );
 
-    if (io.typeHeaderOk<IOdictionary>(true))
+    if (io.headerOk())
     {
         io.readOpt() = IOobject::MUST_READ_IF_MODIFIED;
         return io;

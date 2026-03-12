@@ -54,7 +54,7 @@ SourceFiles
 #include "scalarMatrices.H"
 #include "globalIndex.H"
 #include "scalarListIOList.H"
-#include "mapDistribute.H"
+#include "polyDistributionMap.H"
 #include "volFields.H"
 #include "hashedWordList.H"
 
@@ -79,7 +79,7 @@ class viewFactorSky
         labelListIOList finalAgglom_;
 
         //- Map distributed
-        autoPtr<mapDistribute> map_;
+        autoPtr<distributionMap> map_;
 
         //- Coarse mesh
         singleCellFvMesh coarseMesh_;

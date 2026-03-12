@@ -13,9 +13,9 @@ if(pcEqnForm == "mixed")
 {
     //using mixed form for moisture equation - see suGWFoam
     dimensionedScalar rDeltaT = 1.0/runTime.deltaT();
-    volScalarField pc_ss = rDeltaT*(ws_old - ws_n); //additional source term appearing due to dw/dt 
+    volScalarField pc_ss = rDeltaT*(ws_old - ws_n); //additional source term appearing due to dw/dt
 
-    pc.oldTime() = pc_n; //Tricking OpenFOAM to use pc value from previous Picard iteration, instead of previous timestep
+    pc.oldTimeRef() = pc_n; //Tricking OpenFOAM to use pc value from previous Picard iteration
 
     fvScalarMatrix pcEqn
     (
@@ -28,7 +28,7 @@ if(pcEqnForm == "mixed")
     );
     pcEqn.solve();
 
-    pc.oldTime() = pc_old; //restoring pc.oldTime()
+    pc.oldTimeRef() = pc_old; //restoring pc.oldTime()
 }
 else
 {

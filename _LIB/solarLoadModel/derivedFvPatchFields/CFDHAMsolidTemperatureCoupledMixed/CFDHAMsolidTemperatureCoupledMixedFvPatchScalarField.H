@@ -111,8 +111,14 @@ public:
             CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
+
+        //- Disallow copy without setting internal field reference
+        CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
+        (
+            const CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField&
+        ) = delete;
 
         //- Construct and return a clone
         virtual tmp<fvPatchScalarField> clone() const
@@ -121,7 +127,8 @@ public:
             (
                 new CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
                 (
-                    *this
+                    *this,
+                    this->internalField()
                 )
             );
         }

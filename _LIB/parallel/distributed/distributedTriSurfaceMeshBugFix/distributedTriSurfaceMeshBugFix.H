@@ -58,7 +58,7 @@ SourceFiles
 namespace Foam
 {
 
-class mapDistribute;
+class distributionMap;
 class decompositionMethod;
 
 // Typedefs
@@ -96,7 +96,7 @@ private:
         scalar mergeDist_;
 
         //- Decomposition used when independently decomposing surface.
-        autoPtr<decompositionMethod> decomposer_;
+        autoPtr<decompositionMethod> distributor_;
 
         //- Bounding box settings
         IOdictionary dict_;
@@ -157,7 +157,7 @@ private:
 
             //- Divide edges into local and remote segments. Construct map to
             //  distribute and collect data.
-            autoPtr<mapDistribute> distributeSegments
+            autoPtr<distributionMap> distributeSegments
             (
                 const pointField& start,
                 const pointField& end,
@@ -181,7 +181,7 @@ private:
             //- Obtains global indices from pointIndexHit and swaps them back
             //  to their original processor. Used to calculate local region
             //  and normal.
-            autoPtr<mapDistribute> calcLocalQueries
+            autoPtr<distributionMap> calcLocalQueries
             (
                 const List<pointIndexHit>&,
                 labelList& triangleIndex
@@ -197,7 +197,7 @@ private:
                 boolList& overlaps
             ) const;
 
-            autoPtr<mapDistribute> calcLocalQueries
+            autoPtr<distributionMap> calcLocalQueries
             (
                 const pointField& centres,
                 const scalarField& radiusSqr,
@@ -210,7 +210,7 @@ private:
 
         // Surface redistribution
 
-            //- Finds new bounds based on an indepedent decomposition.
+            //- Finds new bounds based on an independent decomposition.
             List<List<treeBoundBox>> independentlyDistributedBbs
             (
                 const triSurface&
@@ -286,14 +286,7 @@ private:
 
             //- Distribute stored fields
             template<class Type>
-            void distributeFields(const mapDistribute& map);
-
-
-        //- Disallow default bitwise copy construct
-        distributedTriSurfaceMeshBugFix(const distributedTriSurfaceMeshBugFix&);
-
-        //- Disallow default bitwise assignment
-        void operator=(const distributedTriSurfaceMeshBugFix&);
+            void distributeFields(const distributionMap& map);
 
 
 public:
@@ -418,8 +411,8 @@ public:
             (
                 const List<treeBoundBox>&,
                 const bool keepNonLocal,
-                autoPtr<mapDistribute>& faceMap,
-                autoPtr<mapDistribute>& pointMap
+                autoPtr<distributionMap>& faceMap,
+                autoPtr<distributionMap>& pointMap
             );
 
 
@@ -455,7 +448,7 @@ public:
                 IOstream::streamFormat fmt,
                 IOstream::versionNumber ver,
                 IOstream::compressionType cmp,
-                const bool valid
+                const bool write = true
             ) const;
 
             //- Is object global
@@ -464,21 +457,20 @@ public:
                 return false;
             }
 
-            //- Return complete path + object name if the file exists
-            //  either in the case/processor or case otherwise null
-            virtual fileName filePath() const
-            {
-                return searchableSurface::localFilePath(type());
-            }
+
+    // Member Operators
+
+        //- Disallow default bitwise assignment
+        void operator=(const distributedTriSurfaceMeshBugFix&) = delete;
 };
 
 
-//- Template function for obtaining global status
+//- Trait for obtaining global status
 template<>
-inline bool typeGlobal<distributedTriSurfaceMeshBugFix>()
+struct typeGlobal<distributedTriSurfaceMeshBugFix>
 {
-    return false;
-}
+    static const bool global = false;
+};
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

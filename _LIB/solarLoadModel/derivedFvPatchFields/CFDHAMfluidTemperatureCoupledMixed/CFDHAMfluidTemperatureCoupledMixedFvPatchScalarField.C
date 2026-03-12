@@ -27,7 +27,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-#include "mappedPatchBase.H"
+//#include "mappedPatchBase.H" //v8
+#include "mappedFvPatchBaseBase.H" //v12
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -76,10 +77,11 @@ CFDHAMfluidTemperatureCoupledMixedFvPatchScalarField
 :
     mixedFvPatchScalarField(p, iF)
 {
-    if (!isA<mappedPatchBase>(this->patch().patch()))
+    //v8: if (!isA<mappedPatchBase>(this->patch().patch()))
+    if (!isA<mappedFvPatchBaseBase>(this->patch()))
     {
         FatalErrorInFunction
-            << "' not type '" << mappedPatchBase::typeName << "'"
+            << "' not type '" << mappedFvPatchBaseBase::typeName << "'"
             << "\n    for patch " << p.name()
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
@@ -130,19 +132,24 @@ void CFDHAMfluidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     int oldTag = UPstream::msgType();
     UPstream::msgType() = oldTag+1;
 
-    // Get the coupling information from the mappedPatchBase
-    const mappedPatchBase& mpp =
-        refCast<const mappedPatchBase>(patch().patch());
-    const polyMesh& nbrMesh = mpp.sampleMesh();
-    const label samplePatchI = mpp.samplePolyPatch().index();
-    const fvPatch& nbrPatch =
-        refCast<const fvMesh>(nbrMesh).boundary()[samplePatchI];  
+    // Get the mapper and the neighbouring patch
+    //v8: const mappedPatchBase& mpp =
+    //v8:     refCast<const mappedPatchBase>(patch().patch());
+    //v8: const polyMesh& nbrMesh = mpp.sampleMesh();
+    //v8: const label samplePatchI = mpp.samplePolyPatch().index();
+    //v8: const fvPatch& nbrPatch =
+    //v8:     refCast<const fvMesh>(nbrMesh).boundary()[samplePatchI];
+    //v8: scalarField TNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("Ts");
+    //v8: mpp.distribute(TNbr);
+    const mappedFvPatchBaseBase& mapper =
+        mappedFvPatchBaseBase::getMap(patch());
+    const fvPatch& nbrPatch = mapper.nbrFvPatch();
 
-    scalarField TNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("Ts");
-    mpp.distribute(TNbr);
+    tmp<scalarField> TNbr = mapper.fromNeighbour(
+        nbrPatch.lookupPatchField<volScalarField, scalar>("Ts"));
 
     valueFraction() = 1.0;
-    refValue() = TNbr;
+    refValue() = TNbr();
     refGrad() = 0.0;
 
     mixedFvPatchScalarField::updateCoeffs();

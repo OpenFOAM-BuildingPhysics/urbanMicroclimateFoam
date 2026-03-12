@@ -69,26 +69,26 @@ Foam::buildingMaterialModels::Impermeable::Impermeable
 //- Correct the buildingMaterial moisture content (cell)
 void Foam::buildingMaterialModels::Impermeable::update_w_C_cell(const volScalarField& pc, volScalarField& w, volScalarField& Crel, label& celli)
 {
-    w.ref()[celli] = SMALL;
-    Crel.ref()[celli] = GREAT;
+    w[celli] = SMALL;
+    Crel[celli] = GREAT;
 }
 
 //- Correct the buildingMaterial liquid permeability (cell)
 void Foam::buildingMaterialModels::Impermeable::update_Krel_cell(const volScalarField& pc, const volScalarField& w, volScalarField& Krel, label& celli)
 {
-    Krel.ref()[celli] = SMALL;
+    Krel[celli] = SMALL;
 }
 
 //- Correct the buildingMaterial vapor permeability (cell)
 void Foam::buildingMaterialModels::Impermeable::update_Kv_cell(const volScalarField& pc, const volScalarField& w, const volScalarField& T, volScalarField& K_v, label& celli)
 {
-    K_v.ref()[celli] = SMALL;
+    K_v[celli] = SMALL;
 }
 
 //- Correct the buildingMaterial K_pt (cell)
 void Foam::buildingMaterialModels::Impermeable::update_Kpt_cell(const volScalarField& pc, const volScalarField& w, const volScalarField& T, volScalarField& K_pt, label& celli)
 {
-    K_pt.ref()[celli] = SMALL;
+    K_pt[celli] = SMALL;
 }
 
 

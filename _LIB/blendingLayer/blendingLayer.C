@@ -68,7 +68,7 @@ Foam::blendingLayer::blendingLayer
         IOobject
         (
             "bL",
-            time_.timeName(),
+            time_.name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -81,7 +81,7 @@ Foam::blendingLayer::blendingLayer
         IOobject
         (
             "USource_",
-            time_.timeName(),
+            time_.name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -94,7 +94,7 @@ Foam::blendingLayer::blendingLayer
         IOobject
         (
             "TSource_",
-            time_.timeName(),
+            time_.name(),
             mesh_,
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -146,7 +146,7 @@ void Foam::blendingLayer::initialize()
 
     forAll(patchID_WENS,i)
     {
-        patchID_WENS[i] = mesh_.boundaryMesh().findPatchID(patches[i]);
+        patchID_WENS[i] = mesh_.boundaryMesh().findIndex(patches[i]);
         
         startFace[Pstream::myProcNo()].append(mesh_.boundary()[patchID_WENS[i]].start()); //local startFace for this patch
         nFaces[Pstream::myProcNo()].append(mesh_.boundary()[patchID_WENS[i]].size()); //local total face number for this patch        
@@ -253,11 +253,11 @@ void Foam::blendingLayer::initialize()
         if ((found >= startFace_n[patchId]) && (found < startFace_n[patchId] + nFaces_n[patchId]))
         {
             label faceId = found - startFace_n[patchId];
-            bL_.ref()[cellId] = faceId;
+            bL_[cellId] = faceId;
         }
         else
         {
-            bL_.ref()[cellId] = -1000;
+            bL_[cellId] = -1000;
             blendingWarning = 1;
         }
     }
@@ -282,16 +282,16 @@ void Foam::blendingLayer::getValues(volVectorField& USource_, const volVectorFie
     
     label patchId = -1;
     
-    patchId = mesh_.boundaryMesh().findPatchID("west");
+    patchId = mesh_.boundaryMesh().findIndex("west");
     List<vector> UTarget_W = U.boundaryField()[patchId];
     
-    patchId = mesh_.boundaryMesh().findPatchID("east");
+    patchId = mesh_.boundaryMesh().findIndex("east");
     List<vector> UTarget_E = U.boundaryField()[patchId];
     
-    patchId = mesh_.boundaryMesh().findPatchID("north");
+    patchId = mesh_.boundaryMesh().findIndex("north");
     List<vector> UTarget_N = U.boundaryField()[patchId];
         
-    patchId = mesh_.boundaryMesh().findPatchID("south");
+    patchId = mesh_.boundaryMesh().findIndex("south");
     List<vector> UTarget_S = U.boundaryField()[patchId];
 
     forAll (centres, cellI)
@@ -305,7 +305,7 @@ void Foam::blendingLayer::getValues(volVectorField& USource_, const volVectorFie
                 vector UTarget = UTarget_W[faceId];
                 scalar distance = cell.x() - minX;
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                USource_.ref()[cellI] = (UTarget - U.internalField()[cellI]) * 
+                USource_[cellI] = (UTarget - U.internalField()[cellI]) * 
                             alphaCoeffU * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -317,7 +317,7 @@ void Foam::blendingLayer::getValues(volVectorField& USource_, const volVectorFie
                 vector UTarget = UTarget_E[faceId];
                 scalar distance = maxX - cell.x();
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                USource_.ref()[cellI] = (UTarget - U.internalField()[cellI]) * 
+                USource_[cellI] = (UTarget - U.internalField()[cellI]) * 
                             alphaCoeffU * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -329,7 +329,7 @@ void Foam::blendingLayer::getValues(volVectorField& USource_, const volVectorFie
                 vector UTarget = UTarget_N[faceId];
                 scalar distance = maxY - cell.y();
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                USource_.ref()[cellI] = (UTarget - U.internalField()[cellI]) * 
+                USource_[cellI] = (UTarget - U.internalField()[cellI]) * 
                             alphaCoeffU * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }  
@@ -341,7 +341,7 @@ void Foam::blendingLayer::getValues(volVectorField& USource_, const volVectorFie
                 vector UTarget = UTarget_S[faceId];
                 scalar distance = cell.y() - minY;
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                USource_.ref()[cellI] = (UTarget - U.internalField()[cellI]) * 
+                USource_[cellI] = (UTarget - U.internalField()[cellI]) * 
                             alphaCoeffU * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -358,16 +358,16 @@ void Foam::blendingLayer::getValues(volScalarField& TSource_, const volScalarFie
     
     label patchId = -1;
     
-    patchId = mesh_.boundaryMesh().findPatchID("west");
+    patchId = mesh_.boundaryMesh().findIndex("west");
     List<scalar> TTarget_W = T.boundaryField()[patchId];
     
-    patchId = mesh_.boundaryMesh().findPatchID("east");
+    patchId = mesh_.boundaryMesh().findIndex("east");
     List<scalar> TTarget_E = T.boundaryField()[patchId];
     
-    patchId = mesh_.boundaryMesh().findPatchID("north");
+    patchId = mesh_.boundaryMesh().findIndex("north");
     List<scalar> TTarget_N = T.boundaryField()[patchId];
         
-    patchId = mesh_.boundaryMesh().findPatchID("south");
+    patchId = mesh_.boundaryMesh().findIndex("south");
     List<scalar> TTarget_S = T.boundaryField()[patchId];
 
     forAll (centres, cellI)
@@ -381,7 +381,7 @@ void Foam::blendingLayer::getValues(volScalarField& TSource_, const volScalarFie
                 scalar TTarget = TTarget_W[faceId];
                 scalar distance = cell.x() - minX;
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                TSource_.ref()[cellI] = (TTarget - T.internalField()[cellI]) * 
+                TSource_[cellI] = (TTarget - T.internalField()[cellI]) * 
                             alphaCoeffT * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -393,7 +393,7 @@ void Foam::blendingLayer::getValues(volScalarField& TSource_, const volScalarFie
                 scalar TTarget = TTarget_E[faceId];
                 scalar distance = maxX - cell.x();
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                TSource_.ref()[cellI] = (TTarget - T.internalField()[cellI]) * 
+                TSource_[cellI] = (TTarget - T.internalField()[cellI]) * 
                             alphaCoeffT * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -405,7 +405,7 @@ void Foam::blendingLayer::getValues(volScalarField& TSource_, const volScalarFie
                 scalar TTarget = TTarget_N[faceId];
                 scalar distance = maxY - cell.y();
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                TSource_.ref()[cellI] = (TTarget - T.internalField()[cellI]) * 
+                TSource_[cellI] = (TTarget - T.internalField()[cellI]) * 
                             alphaCoeffT * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }  
@@ -417,7 +417,7 @@ void Foam::blendingLayer::getValues(volScalarField& TSource_, const volScalarFie
                 scalar TTarget = TTarget_S[faceId];
                 scalar distance = cell.y() - minY;
                 scalar sinusInput = (dampingThickness - distance)/dampingThickness;
-                TSource_.ref()[cellI] = (TTarget - T.internalField()[cellI]) * 
+                TSource_[cellI] = (TTarget - T.internalField()[cellI]) * 
                             alphaCoeffT * pow(sin( (Foam::constant::mathematical::pi/2)*sinusInput ), 2.0);
             }
         }
@@ -435,7 +435,7 @@ Foam::tmp<Foam::volVectorField> Foam::blendingLayer::bL_USource(const volVectorF
             IOobject
             (
                 "USource",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -457,7 +457,7 @@ Foam::tmp<Foam::volScalarField> Foam::blendingLayer::bL_TSource(const volScalarF
             IOobject
             (
                 "TSource",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

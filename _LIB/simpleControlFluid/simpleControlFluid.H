@@ -66,13 +66,14 @@ class simpleControlFluid
     public fluidSolutionControl,
     public singleRegionConvergenceControl
 {
-
 protected:
 
     // Protected Data
 
         //- Initialised flag
         bool initialised_;
+
+        virtual bool read();
 
 public:
 
@@ -94,15 +95,12 @@ public:
 
     // Member Functions
 
-        // IO
-
-            //- Read controls
-            virtual bool read();
-
         // Evolution
 
             //- Time run loop
             bool run(Time& time);
+
+            bool loop(Time& time);
 
 };
 

@@ -98,8 +98,14 @@ public:
             CFDHAMfluidMoistureCoupledImpermeableFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
+
+        //- Disallow copy without setting internal field reference
+        CFDHAMfluidMoistureCoupledImpermeableFvPatchScalarField
+        (
+            const CFDHAMfluidMoistureCoupledImpermeableFvPatchScalarField&
+        ) = delete;
 
         //- Construct and return a clone
         virtual tmp<fvPatchScalarField> clone() const
@@ -108,7 +114,8 @@ public:
             (
                 new CFDHAMfluidMoistureCoupledImpermeableFvPatchScalarField
                 (
-                    *this
+                    *this,
+                    this->internalField()
                 )
             );
         }

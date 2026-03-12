@@ -1,0 +1,1 @@
+../derivedFvPatchFields/CFDHAMsolidTemperatureCoupledMixed/CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField.C

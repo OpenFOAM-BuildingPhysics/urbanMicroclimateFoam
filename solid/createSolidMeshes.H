@@ -1,11 +1,11 @@
-    const wordList solidsNames(rp["solid"]);
+    // solidNames is defined in urbanMicroclimateFoam.C from controlDict regions dictionary
 
-    PtrList<fvMesh> solidRegions(solidsNames.size());
+    PtrList<fvMesh> solidRegions(solidNames.size());
 
-    forAll(solidsNames, i)
+    forAll(solidNames, i)
     {
-        Info<< "Create solid mesh for region " << solidsNames[i]
-            << " for time = " << runTime.timeName() << nl << endl;
+        Info<< "Create solid mesh for region " << solidNames[i]
+            << " for time = " << runTime.name() << nl << endl;
 
         solidRegions.set
         (
@@ -14,8 +14,8 @@
             (
                 IOobject
                 (
-                    solidsNames[i],
-                    runTime.timeName(),
+                    solidNames[i],
+                    runTime.name(),
                     runTime,
                     IOobject::MUST_READ
                 )

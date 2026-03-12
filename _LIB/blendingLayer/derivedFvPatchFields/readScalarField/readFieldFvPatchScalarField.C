@@ -52,7 +52,7 @@ readFieldFvPatchScalarField
     const readFieldFvPatchScalarField& ptf,
     const fvPatch& p,
     const DimensionedField<scalar, volMesh>& iF,
-    const fvPatchFieldMapper& mapper
+    const fieldMapper& mapper
 )
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
@@ -71,24 +71,12 @@ readFieldFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(p, iF, dict, false),
-    inputTimeStep(readLabel(dict.lookup("inputTimeStep"))),
+    inputTimeStep(dict.lookup<label>("inputTimeStep")),
     Target_Field(p.size()),
     fieldName(iF.name())
 {
     fvPatchScalarField::operator=(scalarField("value", dict, p.size()));
 }
-
-Foam::readFieldFvPatchScalarField::
-readFieldFvPatchScalarField
-(
-    const readFieldFvPatchScalarField& ptf
-)
-:
-    fixedValueFvPatchScalarField(ptf),
-    inputTimeStep(ptf.inputTimeStep),
-    Target_Field(ptf.Target_Field),
-    fieldName(ptf.fieldName)
-{}
 
 
 Foam::readFieldFvPatchScalarField::
@@ -204,8 +192,7 @@ void Foam::readFieldFvPatchScalarField::write
 ) const
 {
     fvPatchScalarField::write(os);
-    os.writeKeyword("inputTimeStep")
-        << inputTimeStep << token::END_STATEMENT << nl;       
+    writeEntry(os, "inputTimeStep", inputTimeStep);
     writeEntry(os, "value", *this);
 }
 

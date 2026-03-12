@@ -1,39 +1,64 @@
-// Initialise fluid field pointer lists
-PtrList<rhoThermo> thermoVeg(vegRegions.size());
+// Initialise vegetation field pointer lists
 PtrList<radiationModel> radiation2(vegRegions.size());
 PtrList<solarLoad::solarLoadModel> solarLoad2(vegRegions.size());
 PtrList<volScalarField> TVeg(vegRegions.size());
 
-// Populate fluid field pointer lists
+// Populate vegetation field pointer lists
 forAll(vegRegions, i)
 {
-    Info<< "*** Reading fluid mesh thermophysical properties for region "
+    Info<< "*** Reading vegetation mesh properties for region "
         << vegRegions[i].name() << nl << endl;
 
     Info<< "    Adding to TVeg\n" << endl;
     TVeg.set
-    (   
-        i,  
+    (
+        i,
         new volScalarField
-        (   
+        (
             IOobject
-            (   
+            (
                 "T",
-                runTime.timeName(),
+                runTime.name(),
                 vegRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
-            ),  
+            ),
             vegRegions[i]
-        )   
-    );  
-
-    radiation2.set
-    (
-        i,
-        radiationModel::New(TVeg[i])
+        )
     );
-    
+
+    // Check if radiationProperties exists; if not, use noRadiation
+    {
+        IOobject radIO
+        (
+            "radiationProperties",
+            runTime.constant(),
+            vegRegions[i],
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+
+        if (radIO.headerOk())
+        {
+            radiation2.set
+            (
+                i,
+                radiationModel::New(TVeg[i])
+            );
+        }
+        else
+        {
+            Info<< "    Radiation model not active for veg region: "
+                << "radiationProperties not found" << endl;
+            radiation2.set
+            (
+                i,
+                new radiationModels::noRadiation(TVeg[i])
+            );
+        }
+    }
+
     solarLoad2.set
     (
         i,

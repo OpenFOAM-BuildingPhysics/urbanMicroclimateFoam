@@ -99,6 +99,12 @@ public:
             const fvPatchFieldMapper&
         );
 
+        //- Disallow copy without setting internal field reference
+        CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
+        (
+            const CFDHAMsolidMoistureCoupledMixedFvPatchScalarField&
+        ) = delete;
+
         //- Construct and return a clone
         virtual tmp<fvPatchScalarField> clone() const
         {
@@ -106,7 +112,8 @@ public:
             (
                 new CFDHAMsolidMoistureCoupledMixedFvPatchScalarField
                 (
-                    *this
+                    *this,
+                    this->internalField()
                 )
             );
         }

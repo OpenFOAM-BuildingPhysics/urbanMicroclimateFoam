@@ -45,7 +45,7 @@ Foam::vegetation::vegetationModel::New
     );
 
     word modelType("none");
-    if (vegetationIO.typeHeaderOk<IOdictionary>(true))
+    if (vegetationIO.headerOk())
     {
         IOdictionary(vegetationIO).lookup("vegetationModel") >> modelType;
     }
@@ -62,10 +62,8 @@ Foam::vegetation::vegetationModel::New
 
     if (cstrIter == TConstructorTablePtr_->end())
     {
-        FatalErrorIn
-        (
-            "vegetationModel::New(const volScalarField&)"
-        )   << "Unknown vegetationModel type "
+        FatalErrorInFunction
+            << "Unknown vegetationModel type "
             << modelType << nl << nl
             << "Valid vegetationModel types are:" << nl
             << TConstructorTablePtr_->sortedToc()

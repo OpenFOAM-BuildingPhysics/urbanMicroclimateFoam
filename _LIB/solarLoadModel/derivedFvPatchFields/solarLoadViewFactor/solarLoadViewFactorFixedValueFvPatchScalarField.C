@@ -25,44 +25,11 @@ License
 
 #include "solarLoadViewFactorFixedValueFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
-#include "fvPatchFieldMapper.H"
+#include "fieldMapper.H"
 #include "volFields.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::
-solarLoadViewFactorFixedValueFvPatchScalarField
-(
-    const fvPatch& p,
-    const DimensionedField<scalar, volMesh>& iF
-)
-:
-    fixedValueFvPatchScalarField(p, iF),
-    solarRadiationCoupledBase(patch(), "undefined", scalarField::null()),
-    qso_(p.size(), 0.0)
-{}
-
-
-Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::
-solarLoadViewFactorFixedValueFvPatchScalarField
-(
-    const solarLoadViewFactorFixedValueFvPatchScalarField& ptf,
-    const fvPatch& p,
-    const DimensionedField<scalar, volMesh>& iF,
-    const fvPatchFieldMapper& mapper
-)
-:
-    fixedValueFvPatchScalarField(ptf, p, iF, mapper),
-    solarRadiationCoupledBase
-    (
-        patch(),
-        ptf.albedoMethod(),
-        ptf.albedo_
-    ),
-    qso_(ptf.qso_)
-{}
-
 
 Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::
 solarLoadViewFactorFixedValueFvPatchScalarField
@@ -74,13 +41,13 @@ solarLoadViewFactorFixedValueFvPatchScalarField
 :
     fixedValueFvPatchScalarField(p, iF, dict, false),
     solarRadiationCoupledBase(p, dict),
-    qso_("qso", dict, p.size())
+    qso_("qso", dimPower/dimArea, dict, p.size())
 {
     if (dict.found("value"))
     {
         fvPatchScalarField::operator=
         (
-            scalarField("value", dict, p.size())
+            scalarField("value",iF.dimensions(), dict, p.size())
         );
 
     }
@@ -94,17 +61,21 @@ solarLoadViewFactorFixedValueFvPatchScalarField
 Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::
 solarLoadViewFactorFixedValueFvPatchScalarField
 (
-    const solarLoadViewFactorFixedValueFvPatchScalarField& ptf
+    const solarLoadViewFactorFixedValueFvPatchScalarField& ptf,
+    const fvPatch& p,
+    const DimensionedField<scalar, volMesh>& iF,
+    const fieldMapper& mapper
 )
 :
-    fixedValueFvPatchScalarField(ptf),
+    fixedValueFvPatchScalarField(ptf, p, iF, mapper),
     solarRadiationCoupledBase
     (
-        ptf.patch(),
+        patch(),
         ptf.albedoMethod(),
-        ptf.albedo_
+        ptf.albedo_,
+        mapper
     ),
-    qso_(ptf.qso_)
+    qso_(mapper(ptf.qso_))
 {}
 
 
@@ -128,8 +99,36 @@ solarLoadViewFactorFixedValueFvPatchScalarField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::
-updateCoeffs()
+void Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::map
+(
+    const fvPatchScalarField& ptf,
+    const fieldMapper& mapper
+)
+{
+    fixedValueFvPatchScalarField::map(ptf, mapper);
+    solarRadiationCoupledBase::map(ptf, mapper);
+    const solarLoadViewFactorFixedValueFvPatchScalarField& mrptf =
+        refCast<const solarLoadViewFactorFixedValueFvPatchScalarField>(ptf);
+
+    mapper(qso_, mrptf.qso_);
+}
+
+
+void Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::reset
+(
+    const fvPatchScalarField& ptf
+)
+{
+    fixedValueFvPatchScalarField::reset(ptf);
+    solarRadiationCoupledBase::reset(ptf);
+    const solarLoadViewFactorFixedValueFvPatchScalarField& mrptf =
+        refCast<const solarLoadViewFactorFixedValueFvPatchScalarField>(ptf);
+
+    qso_.reset(mrptf.qso_);
+}
+
+
+void Foam::solarLoad::solarLoadViewFactorFixedValueFvPatchScalarField::updateCoeffs()
 {
     if (this->updated())
     {

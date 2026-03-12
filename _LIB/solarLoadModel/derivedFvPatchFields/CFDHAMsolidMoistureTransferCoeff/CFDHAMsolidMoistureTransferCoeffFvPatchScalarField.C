@@ -27,9 +27,11 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-#include "mappedPatchBase.H"
+//#include "mappedPatchBase.H" //v8
+#include "mappedFvPatchBaseBase.H" //v12
 #include "fixedValueFvPatchFields.H"
-#include "TableFile.H"
+#include "Function1.H"
+#include "Table.H"
 #include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -85,10 +87,11 @@ CFDHAMsolidMoistureTransferCoeffFvPatchScalarField
     betacoeff_(dict.lookupOrDefault<scalar>("betacoeff",0)),
     pv_o_(dict.lookupOrDefault<fileName>("pv_o", "none"))    
 {
-    if (!isA<mappedPatchBase>(this->patch().patch()))
+    //v8: if (!isA<mappedPatchBase>(this->patch().patch()))
+    if (!isA<mappedFvPatchBaseBase>(this->patch()))
     {
         FatalErrorInFunction
-            << "' not type '" << mappedPatchBase::typeName << "'"
+            << "' not type '" << mappedFvPatchBaseBase::typeName << "'"
             << "\n    for patch " << p.name()
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
@@ -141,15 +144,18 @@ void CFDHAMsolidMoistureTransferCoeffFvPatchScalarField::updateCoeffs()
     int oldTag = UPstream::msgType();
     UPstream::msgType() = oldTag+1;
 
-    // Get the coupling information from the mappedPatchBase
-    const mappedPatchBase& mpp =
-        refCast<const mappedPatchBase>(patch().patch());
-    const polyMesh& nbrMesh = mpp.sampleMesh();
-    const label samplePatchI = mpp.samplePolyPatch().index();
-    const fvPatch& nbrPatch =
-        refCast<const fvMesh>(nbrMesh).boundary()[samplePatchI];
+    // Get the mapper and the neighbouring patch
+    //v8: const mappedPatchBase& mpp =
+    //v8:     refCast<const mappedPatchBase>(patch().patch());
+    //v8: const fvMesh& nbrMesh = refCast<const fvMesh>(mpp.sampleMesh());
+    //v8: const fvPatch& nbrPatch =
+    //v8:     refCast<const fvMesh>(nbrMesh).boundary()[mpp.samplePolyPatch().index()];
+    const mappedFvPatchBaseBase& mapper =
+        mappedFvPatchBaseBase::getMap(patch());
+    const fvPatch& nbrPatch = mapper.nbrFvPatch();
+    const fvMesh& nbrMesh = mapper.nbrMesh();
 
-    scalar rhol=1.0e3; scalar Rv=8.31451*1000/(18.01534);                        
+    scalar rhol=1.0e3; scalar Rv=8.31451*1000/(18.01534);
 
     scalarField& pcp = *this;
 
@@ -164,59 +170,57 @@ void CFDHAMsolidMoistureTransferCoeffFvPatchScalarField::updateCoeffs()
             <const fvPatchScalarField>
             (
                 patch().lookupPatchField<volScalarField, scalar>("pc")
-            );  
+            );
     const mixedFvPatchScalarField&
         nbrFieldw = refCast
             <const mixedFvPatchScalarField>
             (
                 nbrPatch.lookupPatchField<volScalarField, scalar>("w")
-            );            
-                        
+            );
+
     scalarField Ts(pcp.size(), 0.0);
-        Ts = patch().lookupPatchField<volScalarField, scalar>("Ts"); 
-    scalarField TNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("T");
-        mpp.distribute(TNbr); 
+        Ts = patch().lookupPatchField<volScalarField, scalar>("Ts");
+    tmp<scalarField> TNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("T"));
 
-    scalarField wcNbr(nbrFieldw.patchInternalField());
-        mpp.distribute(wcNbr);
-    scalarField wNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("w");
-    scalarField rhoNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("rho");
-    scalarField pv_o = wNbr*1e5/(0.621945*rhoNbr);
-        mpp.distribute(wNbr);
-        mpp.distribute(rhoNbr);
-        mpp.distribute(pv_o);  
-    scalarField pv_o_sat = exp(6.58094e1-7.06627e3/TNbr-5.976*log(TNbr));
-    scalarField pc_o=log(pv_o/pv_o_sat)*rhol*Rv*TNbr; 
+    tmp<scalarField> wcNbr = mapper.fromNeighbour(nbrFieldw.patchInternalField());
+    scalarField wNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("w");
+    scalarField rhoNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("rho");
+    scalarField pv_o_local = wNbr_local*1e5/(0.621945*rhoNbr_local);
+    tmp<scalarField> wNbr = mapper.fromNeighbour(wNbr_local);
+    tmp<scalarField> rhoNbr = mapper.fromNeighbour(rhoNbr_local);
+    tmp<scalarField> pv_o_nbr = mapper.fromNeighbour(pv_o_local);
+    scalarField pv_o_sat = exp(6.58094e1-7.06627e3/TNbr()-5.976*log(TNbr()));
+    scalarField pc_o=log(pv_o_nbr()/pv_o_sat)*rhol*Rv*TNbr();
 
-    scalarField gcrNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("gcr");
-        mpp.distribute(gcrNbr);    
+    tmp<scalarField> gcrNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("gcr"));
 
     scalarField Krel(pcp.size(), 0.0);
-        Krel = patch().lookupPatchField<volScalarField, scalar>("Krel"); 
+        Krel = patch().lookupPatchField<volScalarField, scalar>("Krel");
 
     scalarField K_v(pcp.size(), 0.0);
-        K_v = patch().lookupPatchField<volScalarField, scalar>("K_v");             
+        K_v = patch().lookupPatchField<volScalarField, scalar>("K_v");
 
-    scalarField deltaCoeff_ = nbrPatch.deltaCoeffs(); 
-        mpp.distribute(deltaCoeff_);
-    scalarField nutNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("nut");
-        mpp.distribute(nutNbr);
-    
+    tmp<scalarField> deltaCoeff_ = mapper.fromNeighbour(nbrPatch.deltaCoeffs());
+    tmp<scalarField> nutNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("nut"));
+
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Ts-5.976*log(Ts));
     scalarField pv_s = pvsat_s*exp((pcp)/(rhol*Rv*Ts));
 
-    scalarField gl = ((gcrNbr*rhol)/(3600*1000));
-    
+    scalarField gl = ((gcrNbr()*rhol)/(3600*1000));
+
     Time& time = const_cast<Time&>(nbrMesh.time());
-    
+
     dictionary pv_oValueIO;
+    pv_oValueIO.add("type", "table");
     pv_oValueIO.add(
-        "file", 
+        "file",
         pv_o_
     );
-    Function1s::TableFile<scalar> pv_oValue
+    Function1s::Table<scalar> pv_oValue
     (
         "pv_oValue",
+        dimTime,
+        dimPressure,
         pv_oValueIO
     );
     scalar pv_oValue_ = pv_oValue.value(time.value());

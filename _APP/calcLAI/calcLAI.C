@@ -33,15 +33,14 @@ Description
 #include "argList.H"
 #include "fvMesh.H"
 #include "Time.H"
+#include "timeSelector.H"
 #include "fvc.H"
-#include "fvCFD.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "distributedTriSurfaceMeshBugFix.H"
-#include "cyclicAMIPolyPatch.H"
+#include "cyclicTransform.H"
 #include "triSurfaceTools.H"
-#include "mapDistribute.H"
-//#include "regionProperties.H"
+#include "distributionMap.H"
 #include "OFstream.H"
 #include "meshTools.H"
 #include "meshSearch.H"
@@ -65,12 +64,12 @@ Description
 #include "interpolation.H"
 #include "IOdictionary.H"
 #include "fixedValueFvPatchFields.H"
+#include "zeroGradientFvPatchFields.H"
 #include "wallFvPatch.H"
-//#include "treeDataFace.H"
-#include "unitConversion.H"
-//#include "fvIOoptionList.H"
+#include "uniformDimensionedFields.H"
+#include "dimensionSets.H"
 
-#include "TableFile.H"
+#include "Table.H"
 
 using namespace Foam;
 
@@ -454,14 +453,14 @@ int main(int argc, char *argv[])
     Info << "timeDirs: " << timeDirs << endl;
     runTime.setTime(timeDirs[0], 0);
 
-    #include "createNamedMesh.H"
+    #include "createRegionMeshNoChangers.H"
 
     volScalarField LAD
     (
       IOobject
       (
           "LAD",
-          runTime.timeName(),
+          runTime.name(),
           mesh,
           IOobject::MUST_READ,
           IOobject::NO_WRITE
@@ -472,16 +471,18 @@ int main(int argc, char *argv[])
     // Read sunPosVector list
     dictionary sunPosVectorIO;
     sunPosVectorIO.add(
-        "file", 
+        "file",
         fileName
         (
             mesh.time().constant()
             /"sunPosVector"
         )
     );
-    Function1s::TableFile<vector> sunPosVector
+    Function1s::Table<vector> sunPosVector
     (
         "sunPosVector",
+        dimTime,
+        dimless,
         sunPosVectorIO
     );
     scalarField sunPosVector_x = sunPosVector.x();
@@ -504,18 +505,20 @@ int main(int argc, char *argv[])
     // Read solar radiation intensity flux
     dictionary IDNIO;
     IDNIO.add(
-        "file", 
+        "file",
         fileName
         (
             mesh.time().constant()
             /"IDN"
         )
     );
-    Function1s::TableFile<scalar> IDN
+    Function1s::Table<scalar> IDN
     (
         "IDN",
+        dimTime,
+        dimless,
         IDNIO
-    ); 
+    );
     scalarField IDN_y = IDN.y();
 
     IOdictionary vegetationProperties
@@ -978,7 +981,7 @@ int main(int argc, char *argv[])
                IOobject
                (
                   "LAI",
-                  runTime.timeName(),
+                  runTime.name(),
                   mesh,
                   IOobject::NO_READ
                ),
@@ -992,7 +995,7 @@ int main(int argc, char *argv[])
                 IOobject
                 (
                    "divqrsw",
-                   runTime.timeName(),
+                   runTime.name(),
                    mesh,
                    IOobject::NO_READ
                 ),

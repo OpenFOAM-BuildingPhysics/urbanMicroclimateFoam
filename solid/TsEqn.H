@@ -15,7 +15,7 @@ if(pcEqnForm == "mixed")
    volScalarField Ts_st = Ts_old*(rho_m*cap_m + ws*cap_l);
    volScalarField Ts_ss = rDeltaT*(Ts_st - Ts_sn);
 
-   Ts.oldTime() = Ts_n;  //using Ts from previous Picard iteration, instead of previous time
+   Ts.oldTimeRef() = Ts_n;  //using Ts from previous Picard iteration
 
    fvScalarMatrix TsEqn
    (
@@ -30,7 +30,7 @@ if(pcEqnForm == "mixed")
    );
 
    TsEqn.solve();
-   Ts.oldTime()=Ts_old;
+   Ts.oldTimeRef() = Ts_old;
 
 }
 else

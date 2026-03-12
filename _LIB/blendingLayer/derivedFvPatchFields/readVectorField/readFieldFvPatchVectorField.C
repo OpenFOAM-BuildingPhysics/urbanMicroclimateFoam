@@ -71,25 +71,12 @@ readFieldFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF, dict, false),
-    inputTimeStep(readLabel(dict.lookup("inputTimeStep"))),
+    inputTimeStep(dict.lookup<label>("inputTimeStep")),
     Target_Field(p.size()),
     fieldName(iF.name())
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 }
-
-Foam::readFieldFvPatchVectorField::
-readFieldFvPatchVectorField
-(
-    const readFieldFvPatchVectorField& ptf
-)
-:
-    fixedValueFvPatchVectorField(ptf),
-    inputTimeStep(ptf.inputTimeStep),
-    Target_Field(ptf.Target_Field),
-    fieldName(ptf.fieldName)
-{}
-
 
 Foam::readFieldFvPatchVectorField::
 readFieldFvPatchVectorField
@@ -198,10 +185,10 @@ void Foam::readFieldFvPatchVectorField::updateCoeffs()
     List<scalar> corrFactor_WENS(4);
     forAll(massFlux_WENS,i)
     {
-        label patchId = this->patch().boundaryMesh().findPatchID(patches[i]);
+        label patchId = this->patch().boundaryMesh().findIndex(patches[i]);
         massFlux_WENS[i] = gSum(-1* this->patch().boundaryMesh().mesh().boundary()[patchId].lookupPatchField<surfaceScalarField, scalar>("phi"));        
     }
-    Pstream::listCombineGather(massFlux_WENS, sumOp<scalar>());
+    Pstream::listCombineGather(massFlux_WENS, plusEqOp<scalar>());
     Pstream::listCombineScatter(massFlux_WENS);
 
     scalar corrFactor;
@@ -213,7 +200,6 @@ void Foam::readFieldFvPatchVectorField::updateCoeffs()
         }
     }
     //////////////////////////////////////////////////////////
-    
     operator==(Target_Field*corrFactor);
 
     fixedValueFvPatchVectorField::updateCoeffs();
@@ -226,8 +212,7 @@ void Foam::readFieldFvPatchVectorField::write
 ) const
 {
     fvPatchVectorField::write(os);
-    os.writeKeyword("inputTimeStep")
-        << inputTimeStep << token::END_STATEMENT << nl;       
+    writeEntry(os, "inputTimeStep", inputTimeStep);     
     writeEntry(os, "value", *this);
 }
 

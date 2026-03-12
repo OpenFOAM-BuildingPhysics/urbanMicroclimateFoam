@@ -74,7 +74,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::aCont(const label bandI) cons
             IOobject
             (
                 "aCont",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -97,7 +97,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::aDisp(const label bandI) cons
             IOobject
             (
                 "aDisp",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -127,7 +127,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::eCont(const label bandI) cons
             IOobject
             (
                 "eCont",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -150,7 +150,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::eDisp(const label bandI) cons
             IOobject
             (
                 "eDisp",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -180,7 +180,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::ECont(const label bandI) cons
             IOobject
             (
                 "ECont",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -203,7 +203,7 @@ Foam::solarLoad::solarLoadAbsorptionEmissionModel::EDisp(const label bandI) cons
             IOobject
             (
                 "EDisp",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

@@ -67,7 +67,7 @@ Foam::tmp<Foam::volScalarField> Foam::solarLoad::noScatter::sigmaEff() const
             IOobject
             (
                 "sigma",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

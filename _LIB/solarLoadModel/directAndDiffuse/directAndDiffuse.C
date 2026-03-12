@@ -33,7 +33,11 @@ License
 
 #include "vectorIOList.H"
 
-#include "TableFile.H"
+#include "Function1.H"
+#include "Table.H"
+#include "IFstream.H"
+#include "OFstream.H"
+#include "OSspecific.H"
 
 #include "mappedPatchBase.H"
 
@@ -150,7 +154,7 @@ void Foam::solarLoad::directAndDiffuse::initialise()
 
     map_.reset
     (
-        new mapDistribute
+        new distributionMap
         (
             consMapDim[0],
             move(subMap),
@@ -431,7 +435,7 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse(const volScalarField& T)
         IOobject
         (
             "qs",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
@@ -497,7 +501,7 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse
         IOobject
         (
             "Qs",
-            mesh_.time().timeName(),
+            mesh_.time().name(),
             mesh_,
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
@@ -722,17 +726,20 @@ void Foam::solarLoad::directAndDiffuse::calculate()
     Time& time = const_cast<Time&>(mesh_.time());   
     // Read sunPosVector list
     dictionary sunPosVectorIO;
+    sunPosVectorIO.add("type", "table");
     sunPosVectorIO.add(
-        "file", 
+        "file",
         fileName
         (
             mesh_.time().constant()
             /"sunPosVector"
         )
     );
-    Function1s::TableFile<vector> sunPosVector
+    Function1s::Table<vector> sunPosVector
     (
         "sunPosVector",
+        dimTime,
+        dimless,
         sunPosVectorIO
     );           
     // look for the correct range
@@ -954,7 +961,7 @@ Foam::tmp<Foam::volScalarField> Foam::solarLoad::directAndDiffuse::Rp() const
             IOobject
             (
                 "Rp",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
@@ -982,7 +989,7 @@ Foam::solarLoad::directAndDiffuse::Ru() const
             IOobject
             (
                 "Ru",
-                mesh_.time().timeName(),
+                mesh_.time().name(),
                 mesh_,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,

@@ -68,8 +68,8 @@ SourceFiles
 #define mappedLeafTempFvPatchScalarField_H
 
 #include "fixedValueFvPatchFields.H"
-//#include "interpolation.H"
-#include "mappedPatchFieldBase.H"
+//v8: #include "mappedPatchBase.H"
+#include "mappedInternalPatchBase.H" //v12: cell-based mapping
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,19 +82,24 @@ namespace Foam
 
 class mappedLeafTempFvPatchScalarField
 :
-    public fixedValueFvPatchScalarField,
-    public mappedPatchFieldBase<scalar>
+    public fixedValueFvPatchScalarField
 {
 
 protected:
 
+    // Protected Data
+
+        //- Name of field to map
+        const word fieldName_;
+
+        //v8: mutable autoPtr<mappedPatchBase> mapperPtr_;
+        //v12: mapperPtr_ no longer needed - mapper comes from patch polyPatch
+
+
     // Protected Member Functions
 
-        const mappedPatchBase& mapper
-        (
-            const fvPatch& p,
-            const DimensionedField<scalar, volMesh>& iF
-        );
+        //v12: returns mappedInternalPatchBase (cell-based mapping)
+        const mappedInternalPatchBase& mapper() const;
 
 
 public:
@@ -127,23 +132,14 @@ public:
             const mappedLeafTempFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
 
-        //- Construct as copy
+        //- Disallow copy without setting internal field reference
         mappedLeafTempFvPatchScalarField
         (
             const mappedLeafTempFvPatchScalarField&
-        );
-
-        //- Construct and return a clone
-        virtual tmp<fvPatchScalarField> clone() const
-        {
-            return tmp<fvPatchScalarField>
-            (
-                new mappedLeafTempFvPatchScalarField(*this)
-            );
-        }
+        ) = delete;
 
         //- Construct as copy setting internal field reference
         mappedLeafTempFvPatchScalarField

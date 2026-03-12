@@ -45,7 +45,7 @@ Foam::solarLoad::solarLoadModel::New
     );
 
     word modelType("none");
-    if (solIO.typeHeaderOk<IOdictionary>(false))
+    if (solIO.headerOk())
     {
         IOdictionary(solIO).lookup("solarLoadModel") >> modelType;
     }

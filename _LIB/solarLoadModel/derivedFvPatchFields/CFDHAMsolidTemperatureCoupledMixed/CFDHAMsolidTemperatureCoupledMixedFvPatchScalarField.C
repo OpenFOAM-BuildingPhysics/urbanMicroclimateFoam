@@ -27,13 +27,16 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-#include "mappedPatchBase.H"
+#include "mappedPatchBase.H" //v12: needed for vegetation→air mapping via polyPatch mapper
+#include "mappedFvPatchBaseBase.H" //v12: for solid↔air fvPatch mapper
 #include "fixedValueFvPatchFields.H"
-#include "TableFile.H"
+#include "Function1.H"
+#include "Table.H"
 #include "uniformDimensionedFields.H"
 
 #include "hashedWordList.H"
-#include "regionProperties.H"
+#include "IOdictionary.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -97,10 +100,11 @@ CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField
     qsNbr(Zero),
     timeOfLastRadUpdate(-1.0)
 {
-    if (!isA<mappedPatchBase>(this->patch().patch()))
+    //v8: if (!isA<mappedPatchBase>(this->patch().patch()))
+    if (!isA<mappedFvPatchBaseBase>(this->patch()))
     {
         FatalErrorInFunction
-            << "' not type '" << mappedPatchBase::typeName << "'"
+            << "' not type '" << mappedFvPatchBaseBase::typeName << "'"
             << "\n    for patch " << p.name()
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
@@ -156,13 +160,16 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     int oldTag = UPstream::msgType();
     UPstream::msgType() = oldTag+1;
 
-    // Get the coupling information from the mappedPatchBase
-    const mappedPatchBase& mpp =
-        refCast<const mappedPatchBase>(patch().patch());
-    const polyMesh& nbrMesh = mpp.sampleMesh();
-    const label samplePatchI = mpp.samplePolyPatch().index();
-    const fvPatch& nbrPatch =
-        refCast<const fvMesh>(nbrMesh).boundary()[samplePatchI];
+    // Get the mapper and the neighbouring patch
+    //v8: const mappedPatchBase& mpp =
+    //v8:     refCast<const mappedPatchBase>(patch().patch());
+    //v8: const fvMesh& nbrMesh = refCast<const fvMesh>(mpp.sampleMesh());
+    //v8: const fvPatch& nbrPatch =
+    //v8:     refCast<const fvMesh>(nbrMesh).boundary()[mpp.samplePolyPatch().index()];
+    const mappedFvPatchBaseBase& mapper =
+        mappedFvPatchBaseBase::getMap(patch());
+    const fvPatch& nbrPatch = mapper.nbrFvPatch();
+    const fvMesh& nbrMesh = mapper.nbrMesh();
 
     scalar cap_v = 1880; scalar Tref = 273.15; scalar L_v = 2.5e6; scalar cap_l = 4182;
     scalar cp = 1005; //specific heat of air [J/(kg K)]
@@ -178,10 +185,8 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             (
                 nbrPatch.lookupPatchField<volScalarField, scalar>("T")
             );
-    scalarField TcNbr(nbrField.patchInternalField()); 
-        mpp.distribute(TcNbr);
-    scalarField TNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("T");
-        mpp.distribute(TNbr);
+    tmp<scalarField> TcNbr = mapper.fromNeighbour(nbrField.patchInternalField());
+    tmp<scalarField> TNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("T"));
 
     const mixedFvPatchScalarField&
         nbrFieldw = refCast
@@ -189,14 +194,13 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             (
                 nbrPatch.lookupPatchField<volScalarField, scalar>("w")
             );
-    scalarField wcNbr(nbrFieldw.patchInternalField());
-        mpp.distribute(wcNbr);
-    scalarField wNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("w");
-    scalarField rhoNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("rho");
-    scalarField pv_o = wNbr*1e5/(0.621945*rhoNbr);
-        mpp.distribute(wNbr);
-        mpp.distribute(rhoNbr);  
-        mpp.distribute(pv_o); 
+    tmp<scalarField> wcNbr = mapper.fromNeighbour(nbrFieldw.patchInternalField());
+    scalarField wNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("w");
+    scalarField rhoNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("rho");
+    scalarField pv_o_local = wNbr_local*1e5/(0.621945*rhoNbr_local);
+    tmp<scalarField> wNbr = mapper.fromNeighbour(wNbr_local);
+    tmp<scalarField> rhoNbr = mapper.fromNeighbour(rhoNbr_local);
+    tmp<scalarField> pv_o = mapper.fromNeighbour(pv_o_local); 
 
     const mixedFvPatchScalarField&
         fieldpc = refCast
@@ -218,19 +222,16 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     scalarField lambda_m(Tp.size(), 0.0);
         lambda_m = patch().lookupPatchField<volScalarField, scalar>("lambda_m");                               
 
-    scalarField deltaCoeff_ = nbrPatch.deltaCoeffs();
-        mpp.distribute(deltaCoeff_);
-    scalarField alphatNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("alphat");
-        mpp.distribute(alphatNbr);
-    scalarField nutNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("nut");
-        mpp.distribute(nutNbr); 
+    tmp<scalarField> deltaCoeff_ = mapper.fromNeighbour(nbrPatch.deltaCoeffs());
+    tmp<scalarField> alphatNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("alphat"));
+    tmp<scalarField> nutNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("nut")); 
     
-    scalarField q_conv = (muair/Pr + alphatNbr)*cp*(TcNbr-Tp)*deltaCoeff_; 
+    //scalarField q_conv = (muair/Pr + alphatNbr())*cp*(TcNbr()-Tp)*deltaCoeff_(); 
             
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Tp-5.976*log(Tp));
     scalarField pv_s = pvsat_s*exp((pc)/(rhol*Rv*Tp));
     
-    scalarField g_conv = rhoNbr*(Dm + nutNbr/Sct) * (wcNbr-(0.62198*pv_s/1e5)) *deltaCoeff_; 
+    scalarField g_conv = rhoNbr()*(Dm + nutNbr()/Sct) * (wcNbr()-(0.62198*pv_s/1e5)) *deltaCoeff_(); 
     scalarField LE = (cap_v*(Tp-Tref)+L_v)*g_conv;//Latent and sensible heat transfer due to vapor exchange   */
 
     scalarField K_v(Tp.size(), 0.0);
@@ -238,10 +239,9 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     scalarField Krel(Tp.size(), 0.0);
         Krel = patch().lookupPatchField<volScalarField, scalar>("Krel");   
 
-    scalarField gcrNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("gcr");
-        mpp.distribute(gcrNbr); 
+    tmp<scalarField> gcrNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("gcr")); 
 
-    scalarField gl = ((gcrNbr*rhol)/(3600*1000));
+    scalarField gl = ((gcrNbr()*rhol)/(3600*1000));
 
     // Set rain temperature //////////////////////////////////////////////////
     Time& time = const_cast<Time&>(nbrMesh.time());
@@ -256,13 +256,16 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     {
 //        Info << "Found rainTemp file..." << endl;
         dictionary rainTempIO;
+        rainTempIO.add("type", "table");
         rainTempIO.add(
-            "file", 
+            "file",
             rainTempFile
         );
-        Function1s::TableFile<scalar> rT
+        Function1s::Table<scalar> rT
         (
             "rainTemp",
+            dimTime,
+            dimTemperature,
             rainTempIO
         );
         rainTemp = rT.value(time.value());
@@ -273,30 +276,36 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
         // Calculate rain temperature - approximation for wet-bulb temp///////////
         //obtain Tambient - can find a better way to import this value?
         dictionary TambientIO;
+        TambientIO.add("type", "table");
         TambientIO.add(
-            "file", 
+            "file",
             fileName
             (
                 "$FOAM_CASE/0/air/Tambient"
             )
         );
-        Function1s::TableFile<scalar> Tambient
+        Function1s::Table<scalar> Tambient
         (
             "Tambient",
+            dimTime,
+            dimTemperature,
             TambientIO
         );
         
         dictionary wambientIO;
+        wambientIO.add("type", "table");
         wambientIO.add(
-            "file", 
+            "file",
             fileName
             (
                 "$FOAM_CASE/0/air/wambient"
             )
         );
-        Function1s::TableFile<scalar> wambient
+        Function1s::Table<scalar> wambient
         (
             "wambient",
+            dimTime,
+            dimless,
             wambientIO
         );      
         ///////////
@@ -332,37 +341,40 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
 
     //-- Access vegetation region and populate radiation if vegetation exists,
     //otherwise use radiation from air region --//
-    regionProperties rp(time);
-    const wordList vegNames(rp["vegetation"]);
+    //v8: read regionProperties dict to find vegetation regions
+    //v12: regionProperties no longer exists; check objectRegistry directly
+    bool hasVegetation = time.foundObject<polyMesh>("vegetation");
 
-    if (vegNames.size()>0)
+    if (hasVegetation)
     {
         if(radUpdateNow) //update qs and qr once at the beginning
         {
             const word& vegiRegion = "vegetation";
-            const scalar mppVegDistance = 0;
-     
+
             const polyMesh& vegiMesh =
                 patch().boundaryMesh().mesh().time().lookupObject<polyMesh>(vegiRegion);
-     
+
             const word& nbrPatchName = nbrPatch.name();
-     
-            const label patchi = vegiMesh.boundaryMesh().findPatchID(nbrPatchName);
-        
+
+            const label patchi = vegiMesh.boundaryMesh().findIndex(nbrPatchName);
+
             const fvPatch& vegiNbrPatch =
                 refCast<const fvMesh>(vegiMesh).boundary()[patchi];
-     
-            const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), mppVegDistance);
-     
+
+            //v8: constructed ad-hoc mappedPatchBase from solid to vegetation
+            //v8: const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), 0);
+            //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
+            //v12: vegetation patch overlaps air patch (same face layout via nearest mapping),
+            //     so get values from vegetation patch and use solid<->air mapper to redistribute
             if (qrNbrName_ != "none")
             {
-                qrNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
-                mppVeg.distribute(qrNbr);
+                scalarField qrVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
+                qrNbr = mapper.fromNeighbour(qrVeg)();
             }
             if (qsNbrName_ != "none")
             {
-                qsNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
-                mppVeg.distribute(qsNbr);
+                scalarField qsVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
+                qsNbr = mapper.fromNeighbour(qsVeg)();
             }
             timeOfLastRadUpdate = time.value();
         }
@@ -373,13 +385,11 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
         {
             if (qrNbrName_ != "none")
             {
-                qrNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
-                mpp.distribute(qrNbr);
+                qrNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_))();
             }
             if (qsNbrName_ != "none")
             {
-                qsNbr = nbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
-                mpp.distribute(qsNbr);
+                qsNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_))();
             }
             timeOfLastRadUpdate = time.value();
         }
@@ -400,7 +410,7 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
         )
     );
 
-    if (grassProperties.typeHeaderOk<IOdictionary>(true))
+    if (grassProperties.headerOk())
     {
         word grassModel(grassProperties.lookup("grassModel"));
         if (grassModel != "none")
@@ -411,15 +421,14 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             if (grassPatches.found(nbrPatch.name()))//if patch is covered with grass
             {
                 if(radUpdateNow) //update qs and qr once at the beginning
-                {                
-                    scalarField TgNbr = nbrPatch.lookupPatchField<volScalarField, scalar>("Tg");
-                        mpp.distribute(TgNbr);
+                {
+                    tmp<scalarField> TgNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("Tg"));
     
                     const dictionary& coeffs = grassProperties.subDict(grassModel + "Coeffs");
                     scalar LAI = coeffs.lookupOrDefault("LAI", 2.0);
                     scalar beta = coeffs.lookupOrDefault("beta", 0.78);
                     scalar albedoSoil = coeffs.lookupOrDefault("albedoSoil", 0.0);
-                    qrNbr = 6*(TgNbr-Tp); //thermal radiation between grass and surface - Malys et al 2014
+                    qrNbr = 6*(TgNbr()-Tp); //thermal radiation between grass and surface - Malys et al 2014
                                           //assuming external thermal radiation is fully absorbed with grass layer
                     qsNbr = qsNbr*exp(-beta*LAI)*(1-albedoSoil); //solar radiation transmitted through grass layer - solar radiation reflected from soil surface
                 }
@@ -465,15 +474,36 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
 
     if(fieldpc.type() == "compressible::CFDHAMsolidMoistureCoupledImpermeable")
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
+        // valueFraction() = 0;
+        // refValue() = 0;
+        // refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
+
+        scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
+        refValue() = TcNbr + (qrNbr + qsNbr) / h_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            lambda_m * patch().deltaCoeffs()
+        );
+        valueFraction() = h_ / (h_ + kappaDeltaCoeffs);
     }
     else
     {
-        valueFraction() = 0;
-        refValue() = 0;
-        refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
+        // valueFraction() = 0;
+        // refValue() = 0;
+        // refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
+    
+        scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
+        scalarField q_ext = LE + qrNbr + qsNbr + CR + phiGT -X;
+        refValue() = TcNbr + q_ext / h_;
+        refGrad() = 0;
+
+        const scalarField kappaDeltaCoeffs
+        (
+            (lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt) * patch().deltaCoeffs()
+        );
+        valueFraction() = h_ / (h_ + kappaDeltaCoeffs);
     }
 
     mixedFvPatchScalarField::updateCoeffs(); 

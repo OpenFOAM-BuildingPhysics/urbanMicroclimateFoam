@@ -1,11 +1,11 @@
 // Initialise fluid field pointer lists
-PtrList<rhoThermo> thermoFluid(fluidRegions.size());
+PtrList<fluidThermo> thermoFluid(fluidRegions.size());
 PtrList<volScalarField> rhoFluid(fluidRegions.size());
 PtrList<volVectorField> UFluid(fluidRegions.size());
 PtrList<surfaceScalarField> phiFluid(fluidRegions.size());
 PtrList<uniformDimensionedVectorField> gFluid(fluidRegions.size());
 PtrList<compressible::momentumTransportModel> turbulence(fluidRegions.size());
-PtrList<fluidThermophysicalTransportModel> fluidThermophysicalTransport(fluidRegions.size());
+PtrList<fluidThermoThermophysicalTransportModel> fluidThermophysicalTransport(fluidRegions.size());
 PtrList<volScalarField> p_rghFluid(fluidRegions.size());
 PtrList<volScalarField> ghFluid(fluidRegions.size());
 PtrList<surfaceScalarField> ghfFluid(fluidRegions.size());
@@ -18,10 +18,11 @@ PtrList<volScalarField> gcrFluid(fluidRegions.size());
 
 List<scalar> initialMassFluid(fluidRegions.size());
 
-PtrList<pressureControl> pressureControlFluid(fluidRegions.size());
+PtrList<pressureReference> pressureReferenceFluid(fluidRegions.size());
 
 PtrList<IOMRFZoneList> MRFfluid(fluidRegions.size());
-PtrList<fv::options> fluidFvOptions(fluidRegions.size());
+
+PtrList<volVectorField> netForceFluid(fluidRegions.size());
 
 // Populate fluid field pointer lists
 forAll(fluidRegions, i)
@@ -35,7 +36,7 @@ forAll(fluidRegions, i)
     thermoFluid.set
     (
         i,
-        rhoThermo::New(fluidRegions[i]).ptr()
+        fluidThermo::New(fluidRegions[i]).ptr()
     );
 
     Info<< "    Adding to rhoFluid\n" << endl;
@@ -47,21 +48,47 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "rho",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::NO_READ,
                 IOobject::AUTO_WRITE
             ),
             thermoFluid[i].rho()
         )
-    ); 
-
-    radiation.set
-    (
-        i,
-        radiationModel::New(thermoFluid[i].T())
     );
-    
+
+    // Check if radiationProperties exists; if not, use noRadiation
+    {
+        IOobject radIO
+        (
+            "radiationProperties",
+            runTime.constant(),
+            fluidRegions[i],
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+
+        if (radIO.headerOk())
+        {
+            radiation.set
+            (
+                i,
+                radiationModel::New(thermoFluid[i].T())
+            );
+        }
+        else
+        {
+            Info<< "    Radiation model not active: radiationProperties not found"
+                << endl;
+            radiation.set
+            (
+                i,
+                new radiationModels::noRadiation(thermoFluid[i].T())
+            );
+        }
+    }
+
     solarLoad.set
     (
         i,
@@ -72,13 +99,13 @@ forAll(fluidRegions, i)
     (
         i,
         vegetation::vegetationModel::New(thermoFluid[i].T())
-    );  
+    );
 
     grass.set
     (
         i,
         grass::grassModel::New(thermoFluid[i].T())
-    ); 
+    );
 
     Info<< "    Adding to UFluid\n" << endl;
     UFluid.set
@@ -89,7 +116,7 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "U",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
@@ -107,14 +134,14 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "w",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
             ),
             fluidRegions[i]
         )
-    );   
+    );
 
     Info<< "    Adding to gcrFluid\n" << endl;
     gcrFluid.set
@@ -125,14 +152,14 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "gcr",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
             ),
             fluidRegions[i]
         )
-    );   
+    );
 
     Info<< "    Adding to phiFluid\n" << endl;
     phiFluid.set
@@ -143,7 +170,7 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "phi",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
@@ -182,16 +209,16 @@ forAll(fluidRegions, i)
             thermoFluid[i]
         ).ptr()
     );
-    
+
     Info<< "    Adding to thermophysical transport\n" << endl;
     fluidThermophysicalTransport.set
     (
         i,
-        fluidThermophysicalTransportModel::New
+        fluidThermoThermophysicalTransportModel::New
         (
             turbulence[i],
             thermoFluid[i]
-        )
+        ).ptr()
     );
 
     Info<< "    Adding to ghFluid\n" << endl;
@@ -216,7 +243,7 @@ forAll(fluidRegions, i)
             IOobject
             (
                 "p_rgh",
-                runTime.timeName(),
+                runTime.name(),
                 fluidRegions[i],
                 IOobject::MUST_READ,
                 IOobject::AUTO_WRITE
@@ -227,21 +254,41 @@ forAll(fluidRegions, i)
 
     // Force p_rgh to be consistent with p
     p_rghFluid[i] = thermoFluid[i].p() - rhoFluid[i]*ghFluid[i];
- 
-    fluidRegions[i].setFluxRequired(p_rghFluid[i].name());
+
+    fluidRegions[i].schemes().setFluxRequired(p_rghFluid[i].name());
+
+    Info<< "    Adding to netForceFluid\n" << endl;
+    netForceFluid.set
+    (
+        i,
+        new volVectorField
+        (
+            IOobject
+            (
+                "netForce",
+                runTime.name(),
+                fluidRegions[i]
+            ),
+            fvc::reconstruct
+            (
+                (
+                  - ghfFluid[i]*fvc::snGrad(rhoFluid[i])
+                  - fvc::snGrad(p_rghFluid[i])
+                )*fluidRegions[i].magSf()
+            )
+        )
+    );
 
     initialMassFluid[i] = fvc::domainIntegrate(rhoFluid[i]).value();
 
-    pressureControlFluid.set 
+    pressureReferenceFluid.set
     (
         i,
-        new pressureControl
+        new pressureReference
         (
             thermoFluid[i].p(),
             p_rghFluid[i],
-            rhoFluid[i],
-            fluidRegions[i].solutionDict().subDict("SIMPLE"),
-            thermoFluid[i].incompressible()
+            fluidRegions[i].solution().dict().subDict("SIMPLE")
         )
     );
 
@@ -252,14 +299,6 @@ forAll(fluidRegions, i)
         new IOMRFZoneList(fluidRegions[i])
     );
 
-
-    Info<< "    Adding fvOptions\n" << endl;
-    fluidFvOptions.set
-    (
-        i,
-        new fv::options(fluidRegions[i])
-    );
-            
 }
 
 

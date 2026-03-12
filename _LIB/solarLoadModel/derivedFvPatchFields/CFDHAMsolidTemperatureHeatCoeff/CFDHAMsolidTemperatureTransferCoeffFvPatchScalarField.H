@@ -130,6 +130,12 @@ public:
             const fvPatchFieldMapper&
         );
 
+        //- Disallow copy without setting internal field reference
+        CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField
+        (
+            const CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField&
+        ) = delete;
+
         //- Construct and return a clone
         virtual tmp<fvPatchScalarField> clone() const
         {
@@ -137,7 +143,8 @@ public:
             (
                 new CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField
                 (
-                    *this
+                    *this,
+                    this->internalField()
                 )
             );
         }

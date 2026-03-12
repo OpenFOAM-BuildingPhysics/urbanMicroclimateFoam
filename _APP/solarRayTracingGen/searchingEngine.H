@@ -1,4 +1,4 @@
-Random rndGen(653213);
+randomGenerator rndGen(653213);
 
 // Determine mesh bounding boxes:
 List<treeBoundBox> meshBb
@@ -30,7 +30,7 @@ forAll(patches, patchi)
     if 
     (
         !pp.coupled() 
-     && !isA<cyclicAMIPolyPatch>(pp)
+     && !isA<cyclicTransform>(pp)
      && !isA<emptyPolyPatch>(pp)
     )
     {

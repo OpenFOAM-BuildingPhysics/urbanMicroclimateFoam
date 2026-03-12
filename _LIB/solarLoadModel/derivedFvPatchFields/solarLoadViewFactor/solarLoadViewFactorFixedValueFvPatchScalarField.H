@@ -96,13 +96,6 @@ public:
 
     // Constructors
 
-        //- Construct from patch and internal field
-        solarLoadViewFactorFixedValueFvPatchScalarField
-        (
-            const fvPatch&,
-            const DimensionedField<scalar, volMesh>&
-        );
-
         //- Construct from patch, internal field and dictionary
         solarLoadViewFactorFixedValueFvPatchScalarField
         (
@@ -118,25 +111,16 @@ public:
             const solarLoadViewFactorFixedValueFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
-            const fvPatchFieldMapper&
+            const fieldMapper&
         );
 
-        //- Construct as copy
+        //- Disallow copy without setting internal field reference
         solarLoadViewFactorFixedValueFvPatchScalarField
         (
             const solarLoadViewFactorFixedValueFvPatchScalarField&
-        );
+        ) = delete;
 
-        //- Construct and return a clone
-        virtual tmp<fvPatchScalarField> clone() const
-        {
-            return tmp<fvPatchScalarField>
-            (
-                new solarLoadViewFactorFixedValueFvPatchScalarField(*this)
-            );
-        }
-
-        //- Construct as copy setting internal field reference
+        //- Copy constructor setting internal field reference
         solarLoadViewFactorFixedValueFvPatchScalarField
         (
             const solarLoadViewFactorFixedValueFvPatchScalarField&,
@@ -169,6 +153,16 @@ public:
             {
                 return qso_;
             }
+
+
+        // Mapping functions
+
+            //- Map the given fvPatchField onto this fvPatchField
+            virtual void map(const fvPatchScalarField&, const fieldMapper&);
+
+            //- Reset the fvPatchField to the given fvPatchField
+            //  Used for mesh to mesh mapping
+            virtual void reset(const fvPatchScalarField&);
 
 
         // Evaluation functions

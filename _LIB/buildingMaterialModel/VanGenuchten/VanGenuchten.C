@@ -104,9 +104,9 @@ void Foam::buildingMaterialModels::VanGenuchten::update_w_C_cell(const volScalar
 
    scalar m_ = 1.0 - 1.0/n_;
    scalar tmp = pow(-alpha_*pc.internalField()[celli], n_);
-   w.ref()[celli] = wcap_*pow(1+tmp,-m_);
+   w[celli] = wcap_*pow(1+tmp,-m_);
    scalar tmp2 = 1+tmp;
-   Crel.ref()[celli] = mag(-wcap_*m_*n_*alpha_*pow(tmp2,-1-m_)*pow(-alpha_*pc.internalField()[celli],n_-1));
+   Crel[celli] = mag(-wcap_*m_*n_*alpha_*pow(tmp2,-1-m_)*pow(-alpha_*pc.internalField()[celli],n_-1));
 
 }
 
@@ -117,7 +117,7 @@ void Foam::buildingMaterialModels::VanGenuchten::update_Krel_cell(const volScala
 
     scalar tmp = w.internalField()[celli]/wcap_;
     scalar tmp2 = pow(1-pow(tmp,1/m_), m_);
-    Krel.ref()[celli] = Ks_*(Foam::sqrt(tmp))*pow(1-tmp2,2);
+    Krel[celli] = Ks_*(Foam::sqrt(tmp))*pow(1-tmp2,2);
 
 }
 
@@ -128,7 +128,7 @@ void Foam::buildingMaterialModels::VanGenuchten::update_Kv_cell(const volScalarF
 
     scalar tmp = w.internalField()[celli]/wcap_;
     scalar tmp2 = pow(1-pow(tmp,1/m_),2*m_);
-    K_v.ref()[celli] = Ks_*(Foam::sqrt(1-tmp))*tmp2;
+    K_v[celli] = Ks_*(Foam::sqrt(1-tmp))*tmp2;
 }
 
 //- Correct the buildingMaterial K_pt (cell)
@@ -142,7 +142,7 @@ void Foam::buildingMaterialModels::VanGenuchten::update_Kpt_cell(const volScalar
         scalar tmp = w.internalField()[celli]/wcap_;
         scalar tmp2 = pow(1-pow(tmp,1/m_),2*m_);
         scalar Kv = Ks_*(Foam::sqrt(1-tmp))*tmp2;
-        K_pt.ref()[celli] = (Kv/T.internalField()[celli]) * (rho_l*L_v - pc.internalField()[celli]);
+        K_pt[celli] = (Kv/T.internalField()[celli]) * (rho_l*L_v - pc.internalField()[celli]);
 }
 
 //*********************************************************** //

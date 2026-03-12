@@ -26,6 +26,8 @@ License
 #include "mappedLeafTempFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+//v8: #include "mappedFvPatchBaseBase.H"
+#include "mappedInternalPatchBase.H" //v12: mappedInternal uses separate class hierarchy
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -37,7 +39,8 @@ mappedLeafTempFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(p, iF),
-    mappedPatchFieldBase<scalar>(this->mapper(p, iF), *this)
+    fieldName_(iF.name())
+    //v8: mapperPtr_(nullptr)
 {}
 
 
@@ -50,8 +53,18 @@ mappedLeafTempFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(p, iF, dict),
-    mappedPatchFieldBase<scalar>(this->mapper(p, iF), *this, dict)
-{}
+    fieldName_(dict.lookupOrDefault<word>("field", iF.name()))
+    //v8: mapperPtr_(mappedPatchBase::specified(dict) ? new mappedPatchBase(...) : nullptr)
+{
+    //v12: mappedInternal uses mappedInternalPatchBase, not mappedPatchBase
+    if (!isA<mappedInternalPatchBase>(p.patch()))
+    {
+        FatalIOErrorInFunction(dict)
+            << "Field " << iF.name() << " on patch " << p.name()
+            << " is not of mappedInternal type"
+            << exit(FatalIOError);
+    }
+}
 
 
 Foam::mappedLeafTempFvPatchScalarField::
@@ -60,22 +73,12 @@ mappedLeafTempFvPatchScalarField
     const mappedLeafTempFvPatchScalarField& ptf,
     const fvPatch& p,
     const DimensionedField<scalar, volMesh>& iF,
-    const fvPatchFieldMapper& mapper
+    const fieldMapper& mapper
 )
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
-    mappedPatchFieldBase<scalar>(this->mapper(p, iF), *this, ptf)
-{}
-
-
-Foam::mappedLeafTempFvPatchScalarField::
-mappedLeafTempFvPatchScalarField
-(
-    const mappedLeafTempFvPatchScalarField& ptf
-)
-:
-    fixedValueFvPatchScalarField(ptf),
-    mappedPatchFieldBase<scalar>(ptf)
+    fieldName_(ptf.fieldName_)
+    //v8: mapperPtr_(ptf.mapperPtr_.valid() ? new mappedPatchBase(...) : nullptr)
 {}
 
 
@@ -87,28 +90,26 @@ mappedLeafTempFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(ptf, iF),
-    mappedPatchFieldBase<scalar>(this->mapper(this->patch(), iF), *this, ptf)
+    fieldName_(ptf.fieldName_)
+    //v8: mapperPtr_(ptf.mapperPtr_.valid() ? new mappedPatchBase(...) : nullptr)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const Foam::mappedPatchBase& Foam::mappedLeafTempFvPatchScalarField::mapper
-(
-    const fvPatch& p,
-    const DimensionedField<scalar, volMesh>& iF
-)
+//v8: const Foam::mappedPatchBase& Foam::mappedLeafTempFvPatchScalarField::mapper() const
+//v8: {
+//v8:     return
+//v8:         mapperPtr_.valid()
+//v8:       ? mapperPtr_()
+//v8:       : mappedPatchBase::getMap(this->patch().patch());
+//v8: }
+
+//v12: mappedInternal uses mappedInternalPatchBase (cell-based, not patch-based)
+const Foam::mappedInternalPatchBase&
+Foam::mappedLeafTempFvPatchScalarField::mapper() const
 {
-    if (!isA<mappedPatchBase>(p.patch()))
-    {
-        FatalErrorInFunction
-            << "' not type '" << mappedPatchBase::typeName << "'"
-            << "\n    for patch " << p.patch().name()
-            << " of field " << iF.name()
-            << " in file " << iF.objectPath()
-            << exit(FatalError);
-    }
-    return refCast<const mappedPatchBase>(p.patch());
+    return refCast<const mappedInternalPatchBase>(this->patch().patch());
 }
 
 
@@ -118,14 +119,31 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
     {
         return;
     }
-    
-    this->operator==(this->mappedField());
+
+    // Get the mapper and the neighbouring mesh
+    //v8: const mappedPatchBase& mpp = this->mapper();
+    //v8: const polyMesh& nbrMesh = mpp.sampleMesh();
+    //v8: const fvPatch& nbrPatch =
+    //v8:     refCast<const fvMesh>(nbrMesh).boundary()[mpp.samplePolyPatch().index()];
+    //v8: scalarField tnbrIntFld = nbrPatch.lookupPatchField<volScalarField, scalar>(fieldName_);
+    //v8: mpp.distribute(tnbrIntFld);
+
+    //v12: mappedInternal distributes internal cell values to this patch
+    const mappedInternalPatchBase& mipb = this->mapper();
+    const fvMesh& nbrMesh = refCast<const fvMesh>(mipb.nbrMesh());
+    const volScalarField& nbrField =
+        nbrMesh.lookupObject<volScalarField>(fieldName_);
+
+    // Distribute cell values from air region to vegetation patch faces
+    tmp<scalarField> tnbrIntFld = mipb.distribute(nbrField);
+
+    this->operator==(tnbrIntFld);
 
     const fvMesh& airMesh = db().time().lookupObject<fvMesh>("air");
     const volScalarField& Tl = airMesh.lookupObject<volScalarField>("Tl");
-    const volScalarField& LAD = airMesh.lookupObject<volScalarField>("LAD");       
-    scalar Tl_avg = gSum(Tl.field()*LAD.field())/gSum(LAD.field());
-    
+    const volScalarField& LAD = airMesh.lookupObject<volScalarField>("LAD");
+    scalar Tl_avg = gSum(Tl.primitiveField()*LAD.primitiveField())/gSum(LAD.primitiveField());
+
     scalarField& Tp = *this;
     forAll(Tp, i)
     {
@@ -134,8 +152,6 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
             Tp[i] = Tl_avg;
         }
     }
-    
-        
 
     fixedValueFvPatchScalarField::updateCoeffs();
 }
@@ -144,7 +160,8 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
 void Foam::mappedLeafTempFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
-    mappedPatchFieldBase<scalar>::write(os);
+    writeEntry(os, "field", fieldName_);
+    //v8: if (mapperPtr_.valid()) { mapperPtr_->write(os); }
     writeEntry(os, "value", *this);
 }
 

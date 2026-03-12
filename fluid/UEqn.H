@@ -1,14 +1,12 @@
     // Solve the Momentum equation
 
-    MRF.correctBoundaryVelocity(U);
-
     tmp<fvVectorMatrix> tUEqn
     (
         fvm::div(phi, U)
       + MRF.DDt(rho, U)
       + turb.divDevTau(U)
      ==
-        fvOptions(rho, U)
+        fvModels.source(rho, U)
       - fvm::SuSp(gra.Cf()*rho*mag(U), U)
       - fvm::SuSp(veg.Cf()*rho*mag(U), U) // vegetation momentum source
     );
@@ -21,19 +19,13 @@
 
     UEqn.relax();
 
-    fvOptions.constrain(UEqn);
+    fvConstraints.constrain(UEqn);
 
     solve
     (
         UEqn
      ==
-        fvc::reconstruct
-        (
-            (
-              - ghf*fvc::snGrad(rho)
-              - fvc::snGrad(p_rgh)
-            )*mesh.magSf()
-        )
+        netForce
     );
 
-    fvOptions.correct(U);
+    fvConstraints.constrain(U);
