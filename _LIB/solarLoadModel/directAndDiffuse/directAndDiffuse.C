@@ -40,6 +40,7 @@ License
 #include "OSspecific.H"
 
 #include "mappedPatchBase.H"
+#include "mappedInternalFvPatch.H"
 
 using namespace Foam::constant;
 
@@ -73,13 +74,19 @@ void Foam::solarLoad::directAndDiffuse::initialise()
             selectedPatches_[count] = qsPatchI.patch().index();
             nLocalCoarseFaces_ += coarsePatches[patchI].size();
             
-            if ((isA<wallFvPatch>(mesh_.boundary()[patchI])))
+            // v12: mappedInternal patches (e.g. air_to_vegetation) need
+            // wall-like treatment for solar radiation
+            if
+            (
+                isA<wallFvPatch>(mesh_.boundary()[patchI])
+             || isA<mappedInternalFvPatch>(mesh_.boundary()[patchI])
+            )
             {
                 wallPatchOrNot_[count] = 1;
                 nLocalWallCoarseFaces_ += coarsePatches[patchI].size();
                 nLocalFineFaces_ += qsPatchI.patch().size();
-            }    
-            
+            }
+
             count++;
         }
     }
@@ -88,8 +95,8 @@ void Foam::solarLoad::directAndDiffuse::initialise()
     Info << "wallPatchOrNot_: " << wallPatchOrNot_ << endl;
     Info << "nLocalWallCoarseFaces_: " << nLocalWallCoarseFaces_ << endl;
     
-    selectedPatches_.resize(count--);
-    wallPatchOrNot_.resize(count--);
+    selectedPatches_.resize(count);
+    wallPatchOrNot_.resize(count);
 
     Info<< "Selected patches:" << selectedPatches_ << endl;
     Info<< "Number of coarse faces:" << nLocalCoarseFaces_ << endl;
@@ -916,7 +923,11 @@ void Foam::solarLoad::directAndDiffuse::calculate()
                     label faceI = fineFaces[k];
 
                     qsp[faceI] = q[globalCoarse];
-                    if (isA<wallFvPatch>(mesh_.boundary()[patchID]))
+                    if
+                    (
+                        isA<wallFvPatch>(mesh_.boundary()[patchID])
+                     || isA<mappedInternalFvPatch>(mesh_.boundary()[patchID])
+                    )
                     {
                         label globalFine =
                             globalNumberingFine.toGlobal(Pstream::myProcNo(), fineFaceNo+faceI);   
@@ -928,7 +939,11 @@ void Foam::solarLoad::directAndDiffuse::calculate()
                 globCoarseId ++;
             }
         }
-        if (isA<wallFvPatch>(mesh_.boundary()[patchID]))
+        if
+        (
+            isA<wallFvPatch>(mesh_.boundary()[patchID])
+         || isA<mappedInternalFvPatch>(mesh_.boundary()[patchID])
+        )
         {
             fineFaceNo += pp.size();
         }

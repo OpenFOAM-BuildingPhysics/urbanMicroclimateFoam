@@ -62,6 +62,7 @@ Description
 #include "IOdictionary.H"
 #include "fixedValueFvPatchFields.H"
 #include "wallFvPatch.H"
+#include "mappedInternalFvPatch.H"
 
 #include "unitConversion.H"
 #include "dimensionSets.H"
@@ -326,7 +327,16 @@ int main(int argc, char *argv[])
         const fvPatchScalarField& qrpI = qrb[patchi];
 
         //if ((isA<fixedValueFvPatchScalarField>(QrpI)) && (pp.size() > 0))
-        if ((isA<wallFvPatch>(mesh.boundary()[patchi])) && (pp.size() > 0))
+        // v12: also include mappedInternal patches (e.g. air_to_vegetation)
+        // which were mappedWall in v8 but changed to mappedInternal in v12
+        if
+        (
+            (
+                isA<wallFvPatch>(mesh.boundary()[patchi])
+             || isA<mappedInternalFvPatch>(mesh.boundary()[patchi])
+            )
+         && (pp.size() > 0)
+        )
         {
             viewFactorsPatches[count] = qrpI.patch().index();
             nCoarseFaces += coarsePatches[patchi].size();

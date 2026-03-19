@@ -30,7 +30,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 
 #include "mixedFvPatchFields.H"
-//#include "mappedPatchBase.H" //v8
+#include "mappedPatchBase.H" //v12: needed for vegetation→air mapping via ad-hoc mapper
 #include "mappedFvPatchBaseBase.H" //v12
 
 // regionProperties removed in v12 - use direct mesh lookup instead
@@ -232,31 +232,24 @@ void Foam::grass::simpleGrass::calculate
                 const fvPatch& vegiNbrPatch =
                     refCast<const fvMesh>(vegiMesh).boundary()[vegiPatchID];
 
-                //v8: if (isA<mappedPatchBase>(thisPatch.patch()))
-                if (isA<mappedFvPatchBaseBase>(thisPatch)) //v12
-                {
-                    //v8: const mappedPatchBase& mpp =
-                    //v8:     refCast<const mappedPatchBase>(thisPatch.patch());
-                    const mappedFvPatchBaseBase& mapper =
-                        mappedFvPatchBaseBase::getMap(thisPatch); //v12
+                //v8: const mappedPatchBase& mpp = refCast<const mappedPatchBase>(thisPatch.patch());
+                //v8: const mappedPatchBase& mppVeg = mappedPatchBase(thisPatch.patch(), vegiRegion, mpp.mode(), thisPatch.name(), 0);
+                //v8: qs = vegiNbrPatch.lookupPatchField<...>("qs"); mppVeg.distribute(qs);
+                //v12: direct air→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
+                //     fromNeighbour maps veg field directly onto air patch faces
+                const mappedPatchBase directMapper
+                (
+                    thisPatch.patch(),
+                    "vegetation",
+                    thisPatch.name(),
+                    cyclicTransform()
+                );
 
-                    // Get fields from vegetation patch and map to this patch
-                    //v8: scalarField qsNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
-                    //v8: qs = mpp.fromNeighbour(qsNbr);
-                    //v8: scalarField qrNbr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
-                    //v8: qr = mpp.fromNeighbour(qrNbr);
-                    const fvPatch& nbrPatch = mapper.nbrFvPatch(); //v12
-                    qs = mapper.fromNeighbour(
-                        nbrPatch.lookupPatchField<volScalarField, scalar>("qs"))();
-                    qr = mapper.fromNeighbour(
-                        nbrPatch.lookupPatchField<volScalarField, scalar>("qr"))();
-                }
-                else
-                {
-                    // Direct copy for conformal meshes (same patch size assumed)
-                    qs = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
-                    qr = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
-                }
+                scalarField qsVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qs");
+                qs = directMapper.fromNeighbour(qsVeg)();
+
+                scalarField qrVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>("qr");
+                qr = directMapper.fromNeighbour(qrVeg)();
             }
             else
             {

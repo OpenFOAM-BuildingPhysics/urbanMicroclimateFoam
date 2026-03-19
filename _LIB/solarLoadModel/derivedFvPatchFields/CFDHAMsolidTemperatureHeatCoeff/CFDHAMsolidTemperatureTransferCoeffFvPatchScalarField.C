@@ -27,8 +27,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-//#include "mappedPatchBase.H" //v8
-#include "mappedFvPatchBaseBase.H" //v12
+#include "mappedPatchBase.H" //v12: needed for vegetation→solid mapping via ad-hoc mapper
+#include "mappedFvPatchBaseBase.H" //v12: for solid↔air fvPatch mapper
 #include "fixedValueFvPatchFields.H"
 #include "Function1.H"
 #include "Table.H"
@@ -409,17 +409,25 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
             //v8: constructed ad-hoc mappedPatchBase from solid to vegetation
             //v8: const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), 0);
             //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
-            //v12: vegetation patch overlaps air patch (same face layout via nearest mapping),
-            //     so get values from vegetation patch and use solid<->air mapper to redistribute
+            //v12: direct solid→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
+            //     fromNeighbour maps veg field directly onto solid patch faces
+            const mappedPatchBase directMapper
+            (
+                patch().patch(),
+                vegiRegion,
+                nbrPatchName,
+                cyclicTransform()
+            );
+
             if (qrNbrName_ != "none")
             {
                 scalarField qrVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
-                qrNbr = mapper.fromNeighbour(qrVeg)();
+                qrNbr = directMapper.fromNeighbour(qrVeg)();
             }
             if (qsNbrName_ != "none")
             {
                 scalarField qsVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
-                qsNbr = mapper.fromNeighbour(qsVeg)();
+                qsNbr = directMapper.fromNeighbour(qsVeg)();
             }
             timeOfLastRadUpdate = time.value();
         }

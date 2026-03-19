@@ -39,6 +39,7 @@ License
 
 //#include "mappedPatchBase.H" //v8
 #include "mappedFvPatchBaseBase.H" //v12
+#include "mappedInternalFvPatch.H"
 
 using namespace Foam::constant;
 
@@ -572,7 +573,12 @@ void Foam::radiationModels::viewFactorSky::calculate()
                 forAll(fineFaces, j)
                 {
                     label facei = fineFaces[j];
-                    if (!isA<wallFvPatch>(mesh_.boundary()[patchID])) // added to take into account sky temperature
+                    // v12: mappedInternal patches are physical surfaces, not sky
+                    if
+                    (
+                        !isA<wallFvPatch>(mesh_.boundary()[patchID])
+                     && !isA<mappedInternalFvPatch>(mesh_.boundary()[patchID])
+                    )
                     {
                         scalar Tambient_ = Tambient.value(time.value());
                         scalar ec = (1-0.84*cc)*(0.527 + 0.161*Foam::exp(8.45*(1-273/Tambient_))) +0.84*cc; //cloud emissivity

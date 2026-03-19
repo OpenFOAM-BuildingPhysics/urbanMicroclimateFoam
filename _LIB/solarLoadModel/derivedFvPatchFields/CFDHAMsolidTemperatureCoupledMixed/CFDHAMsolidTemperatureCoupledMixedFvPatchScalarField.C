@@ -226,7 +226,7 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     tmp<scalarField> alphatNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("alphat"));
     tmp<scalarField> nutNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("nut")); 
     
-    //scalarField q_conv = (muair/Pr + alphatNbr())*cp*(TcNbr()-Tp)*deltaCoeff_(); 
+    scalarField q_conv = (muair/Pr + alphatNbr())*cp*(TcNbr()-Tp)*deltaCoeff_(); 
             
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Tp-5.976*log(Tp));
     scalarField pv_s = pvsat_s*exp((pc)/(rhol*Rv*Tp));
@@ -364,17 +364,25 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             //v8: constructed ad-hoc mappedPatchBase from solid to vegetation
             //v8: const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), 0);
             //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
-            //v12: vegetation patch overlaps air patch (same face layout via nearest mapping),
-            //     so get values from vegetation patch and use solid<->air mapper to redistribute
+            //v12: direct solid→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
+            //     fromNeighbour maps veg field directly onto solid patch faces
+            const mappedPatchBase directMapper
+            (
+                patch().patch(),
+                vegiRegion,
+                nbrPatchName,
+                cyclicTransform()
+            );
+
             if (qrNbrName_ != "none")
             {
                 scalarField qrVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qrNbrName_);
-                qrNbr = mapper.fromNeighbour(qrVeg)();
+                qrNbr = directMapper.fromNeighbour(qrVeg)();
             }
             if (qsNbrName_ != "none")
             {
                 scalarField qsVeg = vegiNbrPatch.lookupPatchField<volScalarField, scalar>(qsNbrName_);
-                qsNbr = mapper.fromNeighbour(qsVeg)();
+                qsNbr = directMapper.fromNeighbour(qsVeg)();
             }
             timeOfLastRadUpdate = time.value();
         }
@@ -474,10 +482,6 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
 
     if(fieldpc.type() == "compressible::CFDHAMsolidMoistureCoupledImpermeable")
     {
-        // valueFraction() = 0;
-        // refValue() = 0;
-        // refGrad() = (q_conv + qrNbr + qsNbr)/(lambda_m);
-
         scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
         refValue() = TcNbr + (qrNbr + qsNbr) / h_;
         refGrad() = 0;
@@ -487,13 +491,11 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             lambda_m * patch().deltaCoeffs()
         );
         valueFraction() = h_ / (h_ + kappaDeltaCoeffs);
+
     }
     else
     {
-        // valueFraction() = 0;
-        // refValue() = 0;
-        // refGrad() = (q_conv + LE + qrNbr + qsNbr + CR + phiGT -X)/(lambda_m+(cap_v*(Tp-Tref)+L_v)*K_pt);
-    
+  
         scalarField h_ = (muair/Pr + alphatNbr) * cp * deltaCoeff_;
         scalarField q_ext = LE + qrNbr + qsNbr + CR + phiGT -X;
         refValue() = TcNbr + q_ext / h_;

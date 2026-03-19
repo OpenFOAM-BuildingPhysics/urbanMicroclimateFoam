@@ -13,6 +13,9 @@ while ((simpleControlFluid.run(runTime) || runTime.timeIndex() <= minFluidIterat
         p_rgh.storePrevIter();
         rho.storePrevIter();
 
+        //v12
+        thermo.T().correctBoundaryConditions();
+
         //v12: predict before equations (updates alphat = rho*nut/Prt)
         turb.predict();
         fluidThermophys.predict();
@@ -41,9 +44,8 @@ Info<< nl << fluidRegions[i].name() << " region solution ended in "
 
 runTime.TimeState::operator=(pts); //restore time state
 
-if (maxFluidIteration == 0)
+//v12
 {
-    Info << "Updating T boundary fields..." << endl;
     thermo.T().correctBoundaryConditions();
 }
 Info << "Updating long-wave radiation heat transfer for region: " << fluidRegions[i].name() << endl;
