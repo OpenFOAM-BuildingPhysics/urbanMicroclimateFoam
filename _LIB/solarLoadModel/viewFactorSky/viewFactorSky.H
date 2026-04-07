@@ -87,11 +87,20 @@ class viewFactorSky
         //- Net radiative heat flux [W/m^2]
         volScalarField qr_;
 
-        //- View factor matrix
-        autoPtr<scalarSquareMatrix> Fmatrix_;
+        //- Local sparse view-factor column ids
+        labelListList globalFaceFaces_;
 
-        //- Inverse of C matrix
-        autoPtr<scalarSquareMatrix> CLU_;
+        //- Local sparse view-factor coefficients
+        scalarListList viewFactors_;
+
+        //- Local row to global coarse-face ids
+        labelList localGlobalIds_;
+
+        //- Previous sparse solve result, used as Krylov initial guess
+        mutable scalarField qPrev_;
+
+        //- Whether qPrev_ contains a valid previous solution
+        mutable bool qPrevValid_;
 
         //- Selected patches
         labelList selectedPatches_;
@@ -105,12 +114,6 @@ class viewFactorSky
         //- Constant emissivity
         bool constEmissivity_;
 
-        //- Iterations Counter
-        label iterCounter_;
-
-        //- Pivot Indices for LU decomposition
-        labelList pivotIndices_;
-        
         //- List of grass patches
         hashedWordList grassPatches;
 
@@ -120,15 +123,38 @@ class viewFactorSky
         //- Initialise
         void initialise();
 
-        //- Insert view factors into main matrix
-        void insertMatrixElements
+        //- Assemble locally-owned global vector entries across processors
+        void assembleGlobal(scalarField& x) const;
+
+        //- Dot product over locally-owned rows
+        scalar localDot
         (
-            const globalIndex& index,
-            const label fromProci,
-            const labelListList& globalFaceFaces,
-            const scalarListList& viewFactors,
-            scalarSquareMatrix& matrix
-        );
+            const scalarField& a,
+            const scalarField& b
+        ) const;
+
+        //- Sparse thermal view-factor matrix-vector multiply
+        void multiply
+        (
+            const scalarField& x,
+            const scalarField& E,
+            scalarField& Ax
+        ) const;
+
+        //- Solve the sparse thermal view-factor system
+        scalarField solveViewFactorSystem
+        (
+            const scalarField& b,
+            const scalarField& E
+        ) const;
+
+        //- Compare sparse solution with a rank-0 dense solve for validation
+        void referenceCheck
+        (
+            const scalarField& q,
+            const scalarField& b,
+            const scalarField& E
+        ) const;
 
 
 public:

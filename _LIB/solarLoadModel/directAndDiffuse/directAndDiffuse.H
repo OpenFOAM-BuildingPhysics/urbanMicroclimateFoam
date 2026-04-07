@@ -83,26 +83,38 @@ class directAndDiffuse
         //- Net radiative heat flux [W/m2]
         volScalarField qs_;
 
-        //- View factor matrix
-        autoPtr<scalarSquareMatrix> Fmatrix_;        
+        //- Local sparse view-factor column ids
+        labelListList globalFaceFaces_;
 
-        //- Inverse of C matrix
-        autoPtr<scalarSquareMatrix> CLU_;
-        
-        //- solarLoadFineFaces_
-        autoPtr<scalarListList> solarLoadFineFacesGlobal_;
+        //- Local sparse view-factor coefficients
+        scalarListList viewFactors_;
+
+        //- Local row to global coarse-face ids
+        labelList localGlobalIds_;
+
+        //- Previous sparse solve result, used as Krylov initial guess
+        mutable scalarField qPrev_;
+
+        //- Whether qPrev_ contains a valid previous solution
+        mutable bool qPrevValid_;
+
+        //- Local solar-load fine-face coefficients
+        scalarListList solarLoadFineFaces_;
             
         label solarLoadFineFacesSize;         
         
-        //- skyViewCoeffGlobal_
-        autoPtr<scalarListList> skyViewCoeffGlobal_;
+        //- Local sky view coefficients
+        scalarListList skyViewCoeff_;
 
         label skyViewCoeffSize; 
         
-        //- sunViewCoeffGlobal_
-        autoPtr<scalarListList> sunViewCoeffGlobal_;        
+        //- Local sun view coefficients
+        scalarListList sunViewCoeff_;
 
         label sunViewCoeffSize;    
+
+        //- Local coarse sun/sky global map
+        labelList sunskyMap_;
 
         //- Selected patches
         labelList selectedPatches_;
@@ -131,37 +143,50 @@ class directAndDiffuse
         //- timestepsInADay
         label timestepsInADay_;         
 
-        //- Iterations Counter
-        label iterCounter_;
-
-        //- Pivot Indices for LU decomposition
-        labelList pivotIndices_;
-
     // Private Member Functions
 
         //- Initialise
         void initialise();
 
-        //- Insert view factors into main matrix
-        void insertMatrixElements
+        //- Assemble locally-owned global vector entries across processors
+        void assembleGlobal(scalarField& x) const;
+
+        //- Dot product over locally-owned rows
+        scalar localDot
         (
-            const globalIndex& index,
-            const label fromProcI,
-            const labelListList& globalFaceFaces,
-            const scalarListList& viewFactors,
-            scalarSquareMatrix& matrix
-        );
-        
-        void insertScalarListListElements
+            const scalarField& a,
+            const scalarField& b
+        ) const;
+
+        //- Sparse solar view-factor matrix-vector multiply
+        void multiply
         (
-            const globalIndex& index,
-            const label fromProcI,
-            const labelListList& sunskyMap,
-            const labelListList& globalFaceFaces,
+            const scalarField& x,
+            const scalarField& A,
+            scalarField& Ax
+        ) const;
+
+        //- Solve the sparse solar view-factor system
+        scalarField solveViewFactorSystem
+        (
+            const scalarField& b,
+            const scalarField& A
+        ) const;
+
+        //- Compare sparse solution with a rank-0 dense solve for validation
+        void referenceCheck
+        (
+            const scalarField& q,
+            const scalarField& b,
+            const scalarField& A
+        ) const;
+
+        //- Assemble one local coarse solar coefficient time slice globally
+        scalarField globalCoarseCoeff
+        (
             const scalarListList& localCoeffs,
-            scalarListList& globalCoeffs,
-            const word& coarseOrFine
-        );                    
+            const label vectorId
+        ) const;
 
         //- Disallow default bitwise copy construct
         directAndDiffuse(const directAndDiffuse&);

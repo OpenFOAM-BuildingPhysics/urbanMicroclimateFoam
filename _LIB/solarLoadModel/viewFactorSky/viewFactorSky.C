@@ -170,77 +170,49 @@ void Foam::radiationModels::viewFactorSky::initialise()
         )
     );
 
-    List<labelListList> globalFaceFacesProc(Pstream::nProcs());
-    globalFaceFacesProc[Pstream::myProcNo()] = globalFaceFaces;
-    Pstream::gatherList(globalFaceFacesProc);
+    globalFaceFaces_.setSize(globalFaceFaces.size());
+    viewFactors_.setSize(FmyProc.size());
 
-    List<scalarListList> F(Pstream::nProcs());
-    F[Pstream::myProcNo()] = FmyProc;
-    Pstream::gatherList(F);
-
-    globalIndex globalNumbering(nLocalCoarseFaces_);
-
-    if (Pstream::master())
+    forAll(globalFaceFaces_, facei)
     {
-        Fmatrix_.reset
-        (
-            new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
-        );
+        globalFaceFaces_[facei] = globalFaceFaces[facei];
+        viewFactors_[facei] = FmyProc[facei];
+    }
 
+    bool smoothing = readBool(coeffs_.lookup("smoothing"));
+    if (smoothing)
+    {
         if (debug)
         {
-            InfoInFunction
-                << "Insert elements in the matrix..." << endl;
+            Pout<< "Smoothing local sparse view-factor rows..." << endl;
         }
 
-        for (label proci = 0; proci < Pstream::nProcs(); proci++)
+        forAll(viewFactors_, facei)
         {
-            insertMatrixElements
-            (
-                globalNumbering,
-                proci,
-                globalFaceFacesProc[proci],
-                F[proci],
-                Fmatrix_()
-            );
-        }
+            scalarList& vf = viewFactors_[facei];
 
-
-        bool smoothing = readBool(coeffs_.lookup("smoothing"));
-        if (smoothing)
-        {
-            if (debug)
+            scalar sumF = 0.0;
+            forAll(vf, i)
             {
-                InfoInFunction
-                    << "Smoothing the matrix..." << endl;
+                sumF += vf[i];
             }
 
-            for (label i=0; i<totalNCoarseFaces_; i++)
+            const scalar delta = sumF - 1.0;
+            const scalar scale = 1.0 - delta/(sumF + 0.001);
+            forAll(vf, i)
             {
-                scalar sumF = 0.0;
-                for (label j=0; j<totalNCoarseFaces_; j++)
-                {
-                    sumF += Fmatrix_()(i, j);
-                }
-
-                const scalar delta = sumF - 1.0;
-                for (label j=0; j<totalNCoarseFaces_; j++)
-                {
-                    Fmatrix_()(i, j) *= (1.0 - delta/(sumF + 0.001));
-                }
+                vf[i] *= scale;
             }
         }
+    }
 
-        constEmissivity_ = readBool(coeffs_.lookup("constantEmissivity"));
-        if (constEmissivity_)
-        {
-            CLU_.reset
-            (
-                new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
-            );
+    constEmissivity_ = readBool(coeffs_.lookup("constantEmissivity"));
 
-            pivotIndices_.setSize(CLU_().m());
-        }
+    globalIndex globalNumbering(nLocalCoarseFaces_);
+    localGlobalIds_.setSize(nLocalCoarseFaces_);
+    forAll(localGlobalIds_, i)
+    {
+        localGlobalIds_[i] = globalNumbering.toGlobal(Pstream::myProcNo(), i);
     }
 }
 
@@ -288,14 +260,16 @@ Foam::radiationModels::viewFactorSky::viewFactorSky(const volScalarField& T)
         ),
         mesh_
     ),
-    Fmatrix_(),
-    CLU_(),
+    globalFaceFaces_(),
+    viewFactors_(),
+    localGlobalIds_(),
+    qPrev_(),
+    qPrevValid_(false),
     selectedPatches_(mesh_.boundary().size(), -1),
     totalNCoarseFaces_(0),
     nLocalCoarseFaces_(0),
     constEmissivity_(false),
-    iterCounter_(0),
-    pivotIndices_(0)
+    grassPatches()
 {
     initialise();
 }
@@ -346,14 +320,16 @@ Foam::radiationModels::viewFactorSky::viewFactorSky
         ),
         mesh_
     ),
-    Fmatrix_(),
-    CLU_(),
+    globalFaceFaces_(),
+    viewFactors_(),
+    localGlobalIds_(),
+    qPrev_(),
+    qPrevValid_(false),
     selectedPatches_(mesh_.boundary().size(), -1),
     totalNCoarseFaces_(0),
     nLocalCoarseFaces_(0),
     constEmissivity_(false),
-    iterCounter_(0),
-    pivotIndices_(0)
+    grassPatches()
 {
     initialise();
 }
@@ -380,25 +356,440 @@ bool Foam::radiationModels::viewFactorSky::read()
 }
 
 
-void Foam::radiationModels::viewFactorSky::insertMatrixElements
+void Foam::radiationModels::viewFactorSky::assembleGlobal
 (
-    const globalIndex& globalNumbering,
-    const label proci,
-    const labelListList& globalFaceFaces,
-    const scalarListList& viewFactors,
-    scalarSquareMatrix& Fmatrix
+    scalarField& x
 )
+const
 {
-    forAll(viewFactors, facei)
-    {
-        const scalarList& vf = viewFactors[facei];
-        const labelList& globalFaces = globalFaceFaces[facei];
+    Pstream::listCombineGather(x, plusEqOp<scalar>());
+    Pstream::listCombineScatter(x);
+}
 
-        label globalI = globalNumbering.toGlobal(proci, facei);
+
+Foam::scalar Foam::radiationModels::viewFactorSky::localDot
+(
+    const scalarField& a,
+    const scalarField& b
+)
+const
+{
+    scalar result = 0.0;
+    scalar correction = 0.0;
+    forAll(localGlobalIds_, i)
+    {
+        const label globalI = localGlobalIds_[i];
+        const scalar y = a[globalI]*b[globalI] - correction;
+        const scalar t = result + y;
+        correction = (t - result) - y;
+        result = t;
+    }
+
+    reduce(result, sumOp<scalar>());
+    return result;
+}
+
+
+void Foam::radiationModels::viewFactorSky::multiply
+(
+    const scalarField& x,
+    const scalarField& E,
+    scalarField& Ax
+)
+const
+{
+    Ax = scalarField(totalNCoarseFaces_, 0.0);
+
+    forAll(viewFactors_, facei)
+    {
+        const label globalI = localGlobalIds_[facei];
+        const scalar invEi = 1.0/E[globalI];
+        scalar Axi = invEi*x[globalI];
+        scalar correction = 0.0;
+
+        const scalarList& vf = viewFactors_[facei];
+        const labelList& globalFaces = globalFaceFaces_[facei];
+
         forAll(globalFaces, i)
         {
-            Fmatrix[globalI][globalFaces[i]] = vf[i];
+            const label globalJ = globalFaces[i];
+            const scalar invEj = 1.0/E[globalJ];
+
+            if (globalJ == globalI)
+            {
+                const scalar y =
+                  - (invEj - 1.0)*vf[i]*x[globalJ] - correction;
+                const scalar t = Axi + y;
+                correction = (t - Axi) - y;
+                Axi = t;
+            }
+            else
+            {
+                const scalar y =
+                    (1.0 - invEj)*vf[i]*x[globalJ] - correction;
+                const scalar t = Axi + y;
+                correction = (t - Axi) - y;
+                Axi = t;
+            }
         }
+
+        Ax[globalI] = Axi;
+    }
+
+    assembleGlobal(Ax);
+}
+
+
+Foam::scalarField Foam::radiationModels::viewFactorSky::solveViewFactorSystem
+(
+    const scalarField& b,
+    const scalarField& E
+)
+const
+{
+    const label maxIter =
+        coeffs_.lookupOrDefault<label>("viewFactorMaxIter", 10000);
+    const scalar tolerance =
+        coeffs_.lookupOrDefault<scalar>("viewFactorTolerance", 1e-14);
+    const scalar relTol =
+        coeffs_.lookupOrDefault<scalar>("viewFactorRelTol", 1e-14);
+    const bool usePreviousSolution =
+        coeffs_.lookupOrDefault<bool>("viewFactorUsePreviousSolution", true);
+    const label residualReplacementInterval =
+        coeffs_.lookupOrDefault<label>
+        (
+            "viewFactorResidualReplacementInterval",
+            1
+        );
+
+    scalarField diag(totalNCoarseFaces_, 0.0);
+    forAll(viewFactors_, facei)
+    {
+        const label globalI = localGlobalIds_[facei];
+        const scalar invEi = 1.0/E[globalI];
+        diag[globalI] = invEi;
+
+        const scalarList& vf = viewFactors_[facei];
+        const labelList& globalFaces = globalFaceFaces_[facei];
+        forAll(globalFaces, i)
+        {
+            if (globalFaces[i] == globalI)
+            {
+                diag[globalI] -= (invEi - 1.0)*vf[i];
+                break;
+            }
+        }
+    }
+    assembleGlobal(diag);
+
+    scalarField x(totalNCoarseFaces_, 0.0);
+    if
+    (
+        usePreviousSolution
+     && qPrevValid_
+     && qPrev_.size() == totalNCoarseFaces_
+    )
+    {
+        x = qPrev_;
+    }
+
+    scalarField Ax(totalNCoarseFaces_, 0.0);
+    multiply(x, E, Ax);
+
+    scalarField r(b);
+    forAll(r, i)
+    {
+        r[i] -= Ax[i];
+    }
+    scalarField r0(r);
+    scalarField p(totalNCoarseFaces_, 0.0);
+    scalarField v(totalNCoarseFaces_, 0.0);
+    scalarField s(totalNCoarseFaces_, 0.0);
+    scalarField t(totalNCoarseFaces_, 0.0);
+    scalarField pHat(totalNCoarseFaces_, 0.0);
+    scalarField sHat(totalNCoarseFaces_, 0.0);
+
+    const scalar normB = Foam::sqrt(localDot(b, b));
+    const scalar stop =
+        max(tolerance, relTol*max(normB, VSMALL));
+
+    scalar residual = Foam::sqrt(localDot(r, r));
+    if (Pstream::master())
+    {
+        Info<< "\nSolving sparse view factor equations, initial residual = "
+            << residual << ", stop = " << stop << endl;
+    }
+
+    scalar rho = 1.0;
+    scalar alpha = 1.0;
+    scalar omega = 1.0;
+
+    label iter = 0;
+    for (iter = 0; iter < maxIter && residual > stop; iter++)
+    {
+        const scalar rhoNew = localDot(r0, r);
+        if (mag(rhoNew) < VSMALL || mag(omega) < VSMALL)
+        {
+            WarningInFunction
+                << "BiCGStab breakdown while solving sparse view factors"
+                << endl;
+            break;
+        }
+
+        const scalar beta = (rhoNew/rho)*(alpha/omega);
+
+        forAll(p, i)
+        {
+            p[i] = r[i] + beta*(p[i] - omega*v[i]);
+        }
+
+        pHat = scalarField(totalNCoarseFaces_, 0.0);
+        forAll(localGlobalIds_, i)
+        {
+            const label globalI = localGlobalIds_[i];
+            pHat[globalI] = p[globalI]/stabilise(diag[globalI], VSMALL);
+        }
+        assembleGlobal(pHat);
+
+        multiply(pHat, E, v);
+
+        const scalar r0v = localDot(r0, v);
+        if (mag(r0v) < VSMALL)
+        {
+            WarningInFunction
+                << "BiCGStab alpha breakdown while solving sparse view factors"
+                << endl;
+            break;
+        }
+
+        alpha = rhoNew/r0v;
+
+        forAll(s, i)
+        {
+            s[i] = r[i] - alpha*v[i];
+        }
+
+        residual = Foam::sqrt(localDot(s, s));
+        if (residual <= stop)
+        {
+            forAll(x, i)
+            {
+                x[i] += alpha*pHat[i];
+            }
+            break;
+        }
+
+        sHat = scalarField(totalNCoarseFaces_, 0.0);
+        forAll(localGlobalIds_, i)
+        {
+            const label globalI = localGlobalIds_[i];
+            sHat[globalI] = s[globalI]/stabilise(diag[globalI], VSMALL);
+        }
+        assembleGlobal(sHat);
+
+        multiply(sHat, E, t);
+
+        const scalar tt = localDot(t, t);
+        if (mag(tt) < VSMALL)
+        {
+            WarningInFunction
+                << "BiCGStab omega breakdown while solving sparse view factors"
+                << endl;
+            break;
+        }
+
+        omega = localDot(t, s)/tt;
+
+        forAll(x, i)
+        {
+            x[i] += alpha*pHat[i] + omega*sHat[i];
+            r[i] = s[i] - omega*t[i];
+        }
+
+        rho = rhoNew;
+        if
+        (
+            residualReplacementInterval > 0
+         && ((iter + 1) % residualReplacementInterval) == 0
+        )
+        {
+            Ax = scalarField(totalNCoarseFaces_, 0.0);
+            multiply(x, E, Ax);
+            forAll(r, i)
+            {
+                r[i] = b[i] - Ax[i];
+            }
+        }
+
+        residual = Foam::sqrt(localDot(r, r));
+    }
+
+    Ax = scalarField(totalNCoarseFaces_, 0.0);
+    multiply(x, E, Ax);
+
+    scalarField trueR(b);
+    forAll(trueR, i)
+    {
+        trueR[i] -= Ax[i];
+    }
+
+    const scalar trueResidual = Foam::sqrt(localDot(trueR, trueR));
+    const scalar trueRelResidual = trueResidual/max(normB, VSMALL);
+
+    qPrev_ = x;
+    qPrevValid_ = true;
+
+    if (Pstream::master())
+    {
+        Info<< "Sparse view factor solve completed in " << iter
+            << " iterations, final residual = " << residual
+            << ", true residual = " << trueResidual
+            << ", true relative residual = " << trueRelResidual << endl;
+    }
+
+    return x;
+}
+
+
+void Foam::radiationModels::viewFactorSky::referenceCheck
+(
+    const scalarField& q,
+    const scalarField& b,
+    const scalarField& E
+)
+const
+{
+    if (!coeffs_.lookupOrDefault<bool>("viewFactorReferenceCheck", false))
+    {
+        return;
+    }
+
+    const label maxFaces =
+        coeffs_.lookupOrDefault<label>("viewFactorReferenceCheckMaxFaces", 25000);
+
+    if (totalNCoarseFaces_ > maxFaces)
+    {
+        if (Pstream::master())
+        {
+            Info<< "Skipping dense thermal view-factor reference check: "
+                << totalNCoarseFaces_ << " faces exceeds "
+                << maxFaces << endl;
+        }
+        return;
+    }
+
+    List<labelListList> globalFacesByProc(Pstream::nProcs());
+    globalFacesByProc[Pstream::myProcNo()] = globalFaceFaces_;
+    Pstream::gatherList(globalFacesByProc);
+
+    List<scalarListList> viewFactorsByProc(Pstream::nProcs());
+    viewFactorsByProc[Pstream::myProcNo()] = viewFactors_;
+    Pstream::gatherList(viewFactorsByProc);
+
+    List<labelList> localGlobalIdsByProc(Pstream::nProcs());
+    localGlobalIdsByProc[Pstream::myProcNo()] = localGlobalIds_;
+    Pstream::gatherList(localGlobalIdsByProc);
+
+    if (!Pstream::master())
+    {
+        return;
+    }
+
+    scalarSquareMatrix C(totalNCoarseFaces_, 0.0);
+
+    for (label proci = 0; proci < Pstream::nProcs(); proci++)
+    {
+        const labelListList& globalFaces = globalFacesByProc[proci];
+        const scalarListList& viewFactors = viewFactorsByProc[proci];
+        const labelList& globalIds = localGlobalIdsByProc[proci];
+
+        forAll(viewFactors, facei)
+        {
+            const label globalI = globalIds[facei];
+            const scalarList& vf = viewFactors[facei];
+            const labelList& faces = globalFaces[facei];
+
+            C(globalI, globalI) = 1.0/E[globalI];
+
+            forAll(faces, i)
+            {
+                const label globalJ = faces[i];
+                const scalar invEj = 1.0/E[globalJ];
+
+                if (globalI == globalJ)
+                {
+                    C(globalI, globalJ) -= (invEj - 1.0)*vf[i];
+                }
+                else
+                {
+                    C(globalI, globalJ) = (1.0 - invEj)*vf[i];
+                }
+            }
+        }
+    }
+
+    scalarField qRef(b);
+    LUsolve(C, qRef);
+
+    scalar maxDiff = 0.0;
+    scalar sumDiff = 0.0;
+    label maxI = -1;
+
+    forAll(qRef, i)
+    {
+        const scalar diff = mag(q[i] - qRef[i]);
+        sumDiff += diff;
+        if (diff > maxDiff)
+        {
+            maxDiff = diff;
+            maxI = i;
+        }
+    }
+
+    Info<< "Dense thermal view-factor reference check: max|dq| = "
+        << maxDiff << " at coarse face " << maxI
+        << ", mean|dq| = " << sumDiff/max(label(1), qRef.size())
+        << endl;
+
+    if (coeffs_.lookupOrDefault<bool>("viewFactorReferenceDump", false))
+    {
+        scalarField rowSum(totalNCoarseFaces_, 0.0);
+
+        for (label proci = 0; proci < Pstream::nProcs(); proci++)
+        {
+            const scalarListList& viewFactors = viewFactorsByProc[proci];
+            const labelList& globalIds = localGlobalIdsByProc[proci];
+
+            forAll(viewFactors, facei)
+            {
+                const label globalI = globalIds[facei];
+                rowSum[globalI] = sum(viewFactors[facei]);
+            }
+        }
+
+        static label dumpCounter = 0;
+        const fileName dumpFile
+        (
+            mesh_.time().rootPath()
+           /mesh_.time().globalCaseName()
+           /"processor0"
+           /("viewFactorSky_sparseDump_"
+           + Foam::name(dumpCounter++)
+           + "_"
+           + Time::timeName(mesh_.time().value(), 12))
+        );
+
+        OFstream os(dumpFile);
+        os.precision(17);
+        os << "n " << totalNCoarseFaces_ << nl;
+        os << "time " << mesh_.time().value() << nl;
+        os << "b " << b << nl;
+        os << "q " << q << nl;
+        os << "E " << E << nl;
+        os << "rowSum " << rowSum << nl;
+
+        Info<< "Wrote sparse thermal view-factor reference dump: "
+            << dumpFile << endl;
     }
 }
 
@@ -657,133 +1048,34 @@ void Foam::radiationModels::viewFactorSky::calculate()
     Pstream::listCombineScatter(qrExt);
 
     // Net radiation
-    scalarField q(totalNCoarseFaces_, 0.0);
-
-    if (Pstream::master())
+    scalarField b(totalNCoarseFaces_, 0.0);
+    forAll(viewFactors_, facei)
     {
-        // Variable emissivity
-        if (!constEmissivity_)
+        const label globalI = localGlobalIds_[facei];
+        scalar bi =
+            - constant::physicoChemical::sigma.value()*T4[globalI]
+          - qrExt[globalI];
+        scalar correction = 0.0;
+
+        const scalarList& vf = viewFactors_[facei];
+        const labelList& globalFaces = globalFaceFaces_[facei];
+        forAll(globalFaces, i)
         {
-            scalarSquareMatrix C(totalNCoarseFaces_, 0.0);
-
-            for (label i=0; i<totalNCoarseFaces_; i++)
-            {
-                for (label j=0; j<totalNCoarseFaces_; j++)
-                {
-                    const scalar invEj = 1.0/E[j];
-                    const scalar sigmaT4 = physicoChemical::sigma.value()*T4[j];
-
-                    if (i==j)
-                    {
-                        C(i, j) = invEj - (invEj - 1.0)*Fmatrix_()(i, j);
-                        q[i] += (Fmatrix_()(i, j) - 1.0)*sigmaT4 - qrExt[j];
-                    }
-                    else
-                    {
-                        C(i, j) = (1.0 - invEj)*Fmatrix_()(i, j);
-                        q[i] += Fmatrix_()(i, j)*sigmaT4;
-                    }
-
-                }
-            }
-
-            Info<< "\nSolving view factor equations..." << endl;
-
-            // Negative coming into the fluid
-            LUsolve(C, q);
+            const label globalJ = globalFaces[i];
+            const scalar y =
+                vf[i]*constant::physicoChemical::sigma.value()*T4[globalJ]
+              - correction;
+            const scalar t = bi + y;
+            correction = (t - bi) - y;
+            bi = t;
         }
-        else // Constant emissivity
-        {
-            // Initial iter calculates CLU and chaches it
-            if (iterCounter_ == 0)
-            {
-                for (label i=0; i<totalNCoarseFaces_; i++)
-                {
-                    for (label j=0; j<totalNCoarseFaces_; j++)
-                    {
-                        const scalar invEj = 1.0/E[j];
-                        if (i==j)
-                        {
-                            CLU_()(i, j) = invEj-(invEj-1.0)*Fmatrix_()(i, j);
-                        }
-                        else
-                        {
-                            CLU_()(i, j) = (1.0 - invEj)*Fmatrix_()(i, j);
-                        }
-                    }
-                }
 
-                fileName fileCLU
-                (
-                    mesh_.time().rootPath()
-                    /mesh_.time().globalCaseName()
-                    /"processor0/CLU_qr"
-                ); //under processor0 to avoid keeping CLU file for future uses by mistake
-                // Check if file already exists
-                IFstream is(fileCLU);
-                label testCLU = -1;
-                if (is.good())
-                {
-                    is >> testCLU;
-                    if (testCLU == totalNCoarseFaces_)
-                    {
-                        is >> CLU_() >> pivotIndices_;
-                        Info << "Read decomposed C matrix from existing file!" << endl;
-                    }
-                    else
-                    {
-                        testCLU = -1;
-                        Info << "Warning: File for decomposed C matrix does not match totalNCoarseFaces! Will decompose C matrix again..." << endl;
-                    }
-                }
-                if (testCLU == -1)
-                {
-                    Info<< "\nDecomposing C matrix..." << endl;
-                    LUDecompose(CLU_(), pivotIndices_);
-                    
-                    if (Pstream::nProcs() > 1)
-                    {
-                        // Write file - only in parallel cases
-                        OFstream os(fileCLU);
-                        os << totalNCoarseFaces_ << endl;
-                        os << CLU_() << endl;
-                        os << pivotIndices_ << endl;
-                    }
-                }
-            }
-
-            for (label i=0; i<totalNCoarseFaces_; i++)
-            {
-                for (label j=0; j<totalNCoarseFaces_; j++)
-                {
-                    const scalar sigmaT4 =
-                        constant::physicoChemical::sigma.value()*T4[j];
-
-                    if (i==j)
-                    {
-                        q[i] += (Fmatrix_()(i, j) - 1.0)*sigmaT4  - qrExt[j];
-                    }
-                    else
-                    {
-                        q[i] += Fmatrix_()(i, j)*sigmaT4;
-                    }
-                }
-            }
-
-            if (debug)
-            {
-                InfoInFunction
-                    << "\nLU Back substitute C matrix.." << endl;
-            }
-
-            LUBacksubstitute(CLU_(), pivotIndices_, q);
-            iterCounter_ ++;
-        }
+        b[globalI] = bi;
     }
+    assembleGlobal(b);
 
-    // Scatter q and fill qr
-    Pstream::listCombineScatter(q);
-    Pstream::listCombineGather(q, maxEqOp<scalar>());
+    scalarField q(solveViewFactorSystem(b, E));
+    referenceCheck(q, b, E);
 
     label globCoarseId = 0;
     forAll(selectedPatches_, i)
