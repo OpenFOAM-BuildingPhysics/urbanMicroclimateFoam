@@ -849,42 +849,8 @@ def relocate_view_factors_dicts(case_dir: Path, report: Report, apply: bool) -> 
 def relocate_model_property_dicts(case_dir: Path, report: Report, apply: bool) -> None:
     constant_dir = case_dir / "constant"
     air_dir = constant_dir / "air"
-    vegetation_dir = constant_dir / "vegetation"
     if not constant_dir.exists() or not air_dir.exists():
         return
-
-    relocations = {
-        vegetation_dir / "radiationProperties": air_dir / "radiationProperties",
-        vegetation_dir / "solarLoadProperties": air_dir / "solarLoadProperties",
-    }
-
-    for source_path, target_path in relocations.items():
-        if not source_path.exists():
-            continue
-
-        source_text = read_text(source_path)
-        updated_text = source_text
-        if re.search(r'(^\s*)location\s+"[^"]*"\s*;', updated_text, flags=re.M):
-            updated_text = re.sub(
-                r'(^\s*)location\s+"[^"]*"\s*;',
-                r'\1location    "constant/air";',
-                updated_text,
-                flags=re.M,
-            )
-
-        if target_path.exists():
-            existing_text = read_text(target_path)
-            if existing_text != updated_text:
-                report.review.append(
-                    f"model property conflict: {source_path} vs {target_path}"
-                )
-            continue
-
-        if apply:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(updated_text, encoding="utf-8")
-
-        report.changed.append(f"{source_path} -> {target_path}")
 
     if not (air_dir / "vegetationProperties").exists():
         report.review.append(f"missing vegetationProperties: {air_dir / 'vegetationProperties'}")
