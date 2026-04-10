@@ -129,6 +129,9 @@ class viewFactorSky
         //- Pivot indices for dense LU decomposition
         labelList pivotIndices_;
 
+        //- Flag set on ALL procs once ensureDenseStructures has run
+        bool denseStructuresInitialized_;
+
         //- List of grass patches
         hashedWordList grassPatches;
 

@@ -253,11 +253,7 @@ void Foam::radiationModels::viewFactorSky::ensureDenseStructures()
         return;
     }
 
-    if
-    (
-        !Fmatrix_.valid()
-     || Fmatrix_().m() != totalNCoarseFaces_
-    )
+    if (!denseStructuresInitialized_)
     {
         List<labelListList> globalFaceFacesProc(Pstream::nProcs());
         globalFaceFacesProc[Pstream::myProcNo()] = globalFaceFaces_;
@@ -288,6 +284,8 @@ void Foam::radiationModels::viewFactorSky::ensureDenseStructures()
                 );
             }
         }
+
+        denseStructuresInitialized_ = true;
     }
 
     if (constEmissivity_)
@@ -369,6 +367,7 @@ Foam::radiationModels::viewFactorSky::viewFactorSky(const volScalarField& T)
     constEmissivity_(false),
     iterCounter_(0),
     pivotIndices_(0),
+    denseStructuresInitialized_(false),
     grassPatches()
 {
     initialise();
@@ -434,6 +433,7 @@ Foam::radiationModels::viewFactorSky::viewFactorSky
     constEmissivity_(false),
     iterCounter_(0),
     pivotIndices_(0),
+    denseStructuresInitialized_(false),
     grassPatches()
 {
     initialise();

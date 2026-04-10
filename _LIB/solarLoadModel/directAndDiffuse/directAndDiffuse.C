@@ -350,11 +350,7 @@ void Foam::solarLoad::directAndDiffuse::ensureDenseStructures()
         return;
     }
 
-    if
-    (
-        !Fmatrix_.valid()
-     || Fmatrix_().m() != totalNCoarseFaces_
-    )
+    if (!denseStructuresInitialized_)
     {
         List<labelListList> globalFaceFacesProc(Pstream::nProcs());
         globalFaceFacesProc[Pstream::myProcNo()] = globalFaceFaces_;
@@ -385,6 +381,8 @@ void Foam::solarLoad::directAndDiffuse::ensureDenseStructures()
                 );
             }
         }
+
+        denseStructuresInitialized_ = true;
     }
 
     if (constAlbedo_)
@@ -474,7 +472,8 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse(const volScalarField& T)
     constAlbedo_(false),
     timestepsInADay_(24),
     iterCounter_(0),
-    pivotIndices_(0)
+    pivotIndices_(0),
+    denseStructuresInitialized_(false)
 {
     initialise();
 }
@@ -547,7 +546,8 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse
     constAlbedo_(false),
     timestepsInADay_(24),
     iterCounter_(0),
-    pivotIndices_(0)
+    pivotIndices_(0),
+    denseStructuresInitialized_(false)
 {
     initialise();
 }
