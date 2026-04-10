@@ -139,6 +139,18 @@ int main(int argc, char *argv[])
     Info<< "Solid regions: " << solidNames << endl;
     Info<< "Vegetation regions: " << vegNames << endl;
 
+    // -- Configuration summary --
+    {
+        const dictionary& cd = runTime.controlDict();
+        const word vfWorkflow =
+            cd.lookupOrDefault<word>("viewFactorWorkflow", "sparse");
+        Info<< nl
+            << "========================================" << nl
+            << "urbanMicroclimateFoam configuration" << nl
+            << "  viewFactorWorkflow : " << vfWorkflow << nl
+            << "========================================" << nl << endl;
+    }
+
     #include "createFluidMeshes.H"
     #include "createSolidMeshes.H"
     #include "createVegMeshes.H"
