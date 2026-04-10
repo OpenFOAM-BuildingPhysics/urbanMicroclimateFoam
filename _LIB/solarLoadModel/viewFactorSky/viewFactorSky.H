@@ -87,6 +87,9 @@ class viewFactorSky
         //- Net radiative heat flux [W/m^2]
         volScalarField qr_;
 
+        //- View-factor workflow: sparse (default) or dense
+        word viewFactorWorkflow_;
+
         //- Local sparse view-factor column ids
         labelListList globalFaceFaces_;
 
@@ -102,6 +105,12 @@ class viewFactorSky
         //- Whether qPrev_ contains a valid previous solution
         mutable bool qPrevValid_;
 
+        //- Dense view-factor matrix
+        autoPtr<scalarSquareMatrix> Fmatrix_;
+
+        //- Inverse of dense C matrix
+        autoPtr<scalarSquareMatrix> CLU_;
+
         //- Selected patches
         labelList selectedPatches_;
 
@@ -114,6 +123,12 @@ class viewFactorSky
         //- Constant emissivity
         bool constEmissivity_;
 
+        //- Iteration counter for dense constant-emissivity caching
+        label iterCounter_;
+
+        //- Pivot indices for dense LU decomposition
+        labelList pivotIndices_;
+
         //- List of grass patches
         hashedWordList grassPatches;
 
@@ -122,6 +137,22 @@ class viewFactorSky
 
         //- Initialise
         void initialise();
+
+        //- Read and validate the dense/sparse workflow setting
+        void readViewFactorWorkflow();
+
+        //- Ensure dense matrix data structures are available
+        void ensureDenseStructures();
+
+        //- Insert view factors into dense matrix
+        void insertMatrixElements
+        (
+            const globalIndex& index,
+            const label fromProci,
+            const labelListList& globalFaceFaces,
+            const scalarListList& viewFactors,
+            scalarSquareMatrix& matrix
+        );
 
         //- Assemble locally-owned global vector entries across processors
         void assembleGlobal(scalarField& x) const;
@@ -147,6 +178,14 @@ class viewFactorSky
             const scalarField& b,
             const scalarField& E
         ) const;
+
+        //- Solve the dense thermal view-factor system
+        scalarField solveViewFactorSystemDense
+        (
+            const scalarField& T4,
+            const scalarField& qrExt,
+            const scalarField& E
+        );
 
         //- Compare sparse solution with a rank-0 dense solve for validation
         void referenceCheck

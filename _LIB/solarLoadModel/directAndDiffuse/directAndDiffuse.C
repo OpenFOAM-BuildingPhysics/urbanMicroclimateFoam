@@ -60,6 +60,8 @@ namespace Foam
 
 void Foam::solarLoad::directAndDiffuse::initialise()
 {
+    readViewFactorWorkflow();
+
     const polyBoundaryMesh& coarsePatches = coarseMesh_.boundaryMesh();
     const volScalarField::Boundary& qsp = qs_.boundaryField();
 
@@ -311,6 +313,99 @@ void Foam::solarLoad::directAndDiffuse::initialise()
     {
         sunViewCoeff_[i] = sunViewCoeffmyProc[i];
     }
+
+    ensureDenseStructures();
+}
+
+
+void Foam::solarLoad::directAndDiffuse::readViewFactorWorkflow()
+{
+    const dictionary& controlDict = mesh_.time().controlDict();
+
+    viewFactorWorkflow_ =
+        controlDict.lookupOrDefault<word>
+        (
+            "viewFactorWorkflow",
+            coeffs_.lookupOrDefault<word>("viewFactorWorkflow", "sparse")
+        );
+
+    if
+    (
+        viewFactorWorkflow_ != "sparse"
+     && viewFactorWorkflow_ != "dense"
+    )
+    {
+        FatalErrorInFunction
+            << "Unknown viewFactorWorkflow " << viewFactorWorkflow_ << nl
+            << "Valid options are sparse or dense"
+            << exit(FatalError);
+    }
+}
+
+
+void Foam::solarLoad::directAndDiffuse::ensureDenseStructures()
+{
+    if (viewFactorWorkflow_ != "dense")
+    {
+        return;
+    }
+
+    if
+    (
+        !Fmatrix_.valid()
+     || Fmatrix_().m() != totalNCoarseFaces_
+    )
+    {
+        List<labelListList> globalFaceFacesProc(Pstream::nProcs());
+        globalFaceFacesProc[Pstream::myProcNo()] = globalFaceFaces_;
+        Pstream::gatherList(globalFaceFacesProc);
+
+        List<scalarListList> F(Pstream::nProcs());
+        F[Pstream::myProcNo()] = viewFactors_;
+        Pstream::gatherList(F);
+
+        globalIndex globalNumbering(nLocalCoarseFaces_);
+
+        if (Pstream::master())
+        {
+            Fmatrix_.reset
+            (
+                new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
+            );
+
+            for (label procI = 0; procI < Pstream::nProcs(); procI++)
+            {
+                insertMatrixElements
+                (
+                    globalNumbering,
+                    procI,
+                    globalFaceFacesProc[procI],
+                    F[procI],
+                    Fmatrix_()
+                );
+            }
+        }
+    }
+
+    if (constAlbedo_)
+    {
+        if
+        (
+            !CLU_.valid()
+         || CLU_().m() != totalNCoarseFaces_
+        )
+        {
+            CLU_.reset
+            (
+                new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
+            );
+        }
+
+        if (pivotIndices_.size() != totalNCoarseFaces_)
+        {
+            pivotIndices_.setSize(totalNCoarseFaces_);
+        }
+    }
 }
 
 
@@ -357,11 +452,14 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse(const volScalarField& T)
         ),
         mesh_
     ),
+    viewFactorWorkflow_("sparse"),
     globalFaceFaces_(),
     viewFactors_(),
     localGlobalIds_(),
     qPrev_(),
     qPrevValid_(false),
+    Fmatrix_(),
+    CLU_(),
     solarLoadFineFaces_(),
     skyViewCoeff_(),
     sunViewCoeff_(),
@@ -374,7 +472,9 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse(const volScalarField& T)
     nLocalFineFaces_(0),        
     totalNFineFaces_(0),
     constAlbedo_(false),
-    timestepsInADay_(24)
+    timestepsInADay_(24),
+    iterCounter_(0),
+    pivotIndices_(0)
 {
     initialise();
 }
@@ -425,11 +525,14 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse
         ),
         mesh_
     ),
+    viewFactorWorkflow_("sparse"),
     globalFaceFaces_(),
     viewFactors_(),
     localGlobalIds_(),
     qPrev_(),
     qPrevValid_(false),
+    Fmatrix_(),
+    CLU_(),
     solarLoadFineFaces_(),
     skyViewCoeff_(),
     sunViewCoeff_(),
@@ -442,7 +545,9 @@ Foam::solarLoad::directAndDiffuse::directAndDiffuse
     nLocalFineFaces_(0),        
     totalNFineFaces_(0),
     constAlbedo_(false),
-    timestepsInADay_(24)
+    timestepsInADay_(24),
+    iterCounter_(0),
+    pivotIndices_(0)
 {
     initialise();
 }
@@ -460,11 +565,39 @@ bool Foam::solarLoad::directAndDiffuse::read()
 {
     if (solarLoadModel::read())
     {
+        readViewFactorWorkflow();
+        constAlbedo_ = readBool(coeffs_.lookup("constantAlbedo"));
+        qPrevValid_ = false;
+        iterCounter_ = 0;
+        ensureDenseStructures();
         return true;
     }
     else
     {
         return false;
+    }
+}
+
+
+void Foam::solarLoad::directAndDiffuse::insertMatrixElements
+(
+    const globalIndex& globalNumbering,
+    const label procI,
+    const labelListList& globalFaceFaces,
+    const scalarListList& viewFactors,
+    scalarSquareMatrix& Fmatrix
+)
+{
+    forAll(viewFactors, faceI)
+    {
+        const scalarList& vf = viewFactors[faceI];
+        const labelList& globalFaces = globalFaceFaces[faceI];
+
+        label globalI = globalNumbering.toGlobal(procI, faceI);
+        forAll(globalFaces, i)
+        {
+            Fmatrix[globalI][globalFaces[i]] = vf[i];
+        }
     }
 }
 
@@ -749,6 +882,136 @@ const
     }
 
     return x;
+}
+
+
+Foam::scalarField Foam::solarLoad::directAndDiffuse::solveViewFactorSystemDense
+(
+    const scalarField& Isol,
+    const scalarField& qsExt,
+    const scalarField& A
+)
+{
+    ensureDenseStructures();
+
+    scalarField q(totalNCoarseFaces_, 0.0);
+
+    if (!Pstream::master())
+    {
+        return q;
+    }
+
+    if (!constAlbedo_)
+    {
+        scalarSquareMatrix C(totalNCoarseFaces_, 0.0);
+
+        for (label i = 0; i < totalNCoarseFaces_; i++)
+        {
+            for (label j = 0; j < totalNCoarseFaces_; j++)
+            {
+                if (i == j)
+                {
+                    C(i, j) =
+                        (1.0/(1.0 - A[j]))
+                      - (A[j]/(1.0 - A[j]))*Fmatrix_()(i, j);
+                    q[i] += Isol[j] - qsExt[j];
+                }
+                else
+                {
+                    C(i, j) =
+                        -(A[j]/(1.0 - A[j]))*Fmatrix_()(i, j);
+                    q[i] -= qsExt[j];
+                }
+            }
+        }
+
+        Info<< "\nSolving dense solar view factor equations..." << endl;
+        LUsolve(C, q);
+    }
+    else
+    {
+        if (iterCounter_ == 0)
+        {
+            for (label i = 0; i < totalNCoarseFaces_; i++)
+            {
+                for (label j = 0; j < totalNCoarseFaces_; j++)
+                {
+                    if (i == j)
+                    {
+                        CLU_()(i, j) =
+                            (1.0/(1.0 - A[j]))
+                          - (A[j]/(1.0 - A[j]))*Fmatrix_()(i, j);
+                    }
+                    else
+                    {
+                        CLU_()(i, j) =
+                            -(A[j]/(1.0 - A[j]))*Fmatrix_()(i, j);
+                    }
+                }
+            }
+
+            fileName fileCLU
+            (
+                mesh_.time().rootPath()
+               /mesh_.time().globalCaseName()
+               /"processor0/CLU_qs"
+            );
+
+            IFstream is(fileCLU);
+            label testCLU = -1;
+            if (is.good())
+            {
+                is >> testCLU;
+                if (testCLU == totalNCoarseFaces_)
+                {
+                    is >> CLU_() >> pivotIndices_;
+                    Info<< "Read decomposed C matrix from existing file!" << endl;
+                }
+                else
+                {
+                    testCLU = -1;
+                    Info<< "Warning: File for decomposed C matrix does not "
+                        << "match totalNCoarseFaces! Will decompose C matrix "
+                        << "again..." << endl;
+                }
+            }
+
+            if (testCLU == -1)
+            {
+                Info<< "\nDecomposing dense solar C matrix..." << endl;
+                LUDecompose(CLU_(), pivotIndices_);
+
+                if (Pstream::nProcs() > 1)
+                {
+                    OFstream os(fileCLU);
+                    os << totalNCoarseFaces_ << endl;
+                    os << CLU_() << endl;
+                    os << pivotIndices_ << endl;
+                }
+            }
+        }
+
+        for (label i = 0; i < totalNCoarseFaces_; i++)
+        {
+            for (label j = 0; j < totalNCoarseFaces_; j++)
+            {
+                if (i == j)
+                {
+                    q[i] += Isol[j] - qsExt[j];
+                }
+                else
+                {
+                    q[i] -= qsExt[j];
+                }
+            }
+        }
+
+        Info<< "\nLU Back substitute dense solar C matrix.." << endl;
+        LUBacksubstitute(CLU_(), pivotIndices_, q);
+        iterCounter_++;
+    }
+
+    return q;
 }
 
 
@@ -1059,8 +1322,17 @@ void Foam::solarLoad::directAndDiffuse::calculate()
     }
     assembleGlobal(b);
 
-    q = solveViewFactorSystem(b, A);
-    referenceCheck(q, b, A);
+    if (viewFactorWorkflow_ == "dense")
+    {
+        q = solveViewFactorSystemDense(Isol, qsExt, A);
+        Pstream::listCombineScatter(q);
+        Pstream::listCombineGather(q, maxEqOp<scalar>());
+    }
+    else
+    {
+        q = solveViewFactorSystem(b, A);
+        referenceCheck(q, b, A);
+    }
 
     label globCoarseId = 0;
     //label globFineId = 0;    

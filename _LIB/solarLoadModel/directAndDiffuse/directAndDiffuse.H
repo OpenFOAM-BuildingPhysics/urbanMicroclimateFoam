@@ -83,6 +83,9 @@ class directAndDiffuse
         //- Net radiative heat flux [W/m2]
         volScalarField qs_;
 
+        //- View-factor workflow: sparse (default) or dense
+        word viewFactorWorkflow_;
+
         //- Local sparse view-factor column ids
         labelListList globalFaceFaces_;
 
@@ -97,6 +100,12 @@ class directAndDiffuse
 
         //- Whether qPrev_ contains a valid previous solution
         mutable bool qPrevValid_;
+
+        //- Dense view-factor matrix
+        autoPtr<scalarSquareMatrix> Fmatrix_;
+
+        //- Inverse of dense C matrix
+        autoPtr<scalarSquareMatrix> CLU_;
 
         //- Local solar-load fine-face coefficients
         scalarListList solarLoadFineFaces_;
@@ -143,10 +152,32 @@ class directAndDiffuse
         //- timestepsInADay
         label timestepsInADay_;         
 
+        //- Iteration counter for dense constant-albedo caching
+        label iterCounter_;
+
+        //- Pivot indices for dense LU decomposition
+        labelList pivotIndices_;
+
     // Private Member Functions
 
         //- Initialise
         void initialise();
+
+        //- Read and validate the dense/sparse workflow setting
+        void readViewFactorWorkflow();
+
+        //- Ensure dense matrix data structures are available
+        void ensureDenseStructures();
+
+        //- Insert view factors into dense matrix
+        void insertMatrixElements
+        (
+            const globalIndex& index,
+            const label fromProcI,
+            const labelListList& globalFaceFaces,
+            const scalarListList& viewFactors,
+            scalarSquareMatrix& matrix
+        );
 
         //- Assemble locally-owned global vector entries across processors
         void assembleGlobal(scalarField& x) const;
@@ -172,6 +203,14 @@ class directAndDiffuse
             const scalarField& b,
             const scalarField& A
         ) const;
+
+        //- Solve the dense solar view-factor system
+        scalarField solveViewFactorSystemDense
+        (
+            const scalarField& Isol,
+            const scalarField& qsExt,
+            const scalarField& A
+        );
 
         //- Compare sparse solution with a rank-0 dense solve for validation
         void referenceCheck

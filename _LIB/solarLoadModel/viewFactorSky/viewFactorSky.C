@@ -59,6 +59,8 @@ namespace radiationModels
 
 void Foam::radiationModels::viewFactorSky::initialise()
 {
+    readViewFactorWorkflow();
+
     const polyBoundaryMesh& coarsePatches = coarseMesh_.boundaryMesh();
     const volScalarField::Boundary& qrp = qr_.boundaryField();
 
@@ -214,6 +216,99 @@ void Foam::radiationModels::viewFactorSky::initialise()
     {
         localGlobalIds_[i] = globalNumbering.toGlobal(Pstream::myProcNo(), i);
     }
+
+    ensureDenseStructures();
+}
+
+
+void Foam::radiationModels::viewFactorSky::readViewFactorWorkflow()
+{
+    const dictionary& controlDict = mesh_.time().controlDict();
+
+    viewFactorWorkflow_ =
+        controlDict.lookupOrDefault<word>
+        (
+            "viewFactorWorkflow",
+            coeffs_.lookupOrDefault<word>("viewFactorWorkflow", "sparse")
+        );
+
+    if
+    (
+        viewFactorWorkflow_ != "sparse"
+     && viewFactorWorkflow_ != "dense"
+    )
+    {
+        FatalErrorInFunction
+            << "Unknown viewFactorWorkflow " << viewFactorWorkflow_ << nl
+            << "Valid options are sparse or dense"
+            << exit(FatalError);
+    }
+}
+
+
+void Foam::radiationModels::viewFactorSky::ensureDenseStructures()
+{
+    if (viewFactorWorkflow_ != "dense")
+    {
+        return;
+    }
+
+    if
+    (
+        !Fmatrix_.valid()
+     || Fmatrix_().m() != totalNCoarseFaces_
+    )
+    {
+        List<labelListList> globalFaceFacesProc(Pstream::nProcs());
+        globalFaceFacesProc[Pstream::myProcNo()] = globalFaceFaces_;
+        Pstream::gatherList(globalFaceFacesProc);
+
+        List<scalarListList> F(Pstream::nProcs());
+        F[Pstream::myProcNo()] = viewFactors_;
+        Pstream::gatherList(F);
+
+        globalIndex globalNumbering(nLocalCoarseFaces_);
+
+        if (Pstream::master())
+        {
+            Fmatrix_.reset
+            (
+                new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
+            );
+
+            for (label proci = 0; proci < Pstream::nProcs(); proci++)
+            {
+                insertMatrixElements
+                (
+                    globalNumbering,
+                    proci,
+                    globalFaceFacesProc[proci],
+                    F[proci],
+                    Fmatrix_()
+                );
+            }
+        }
+    }
+
+    if (constEmissivity_)
+    {
+        if
+        (
+            !CLU_.valid()
+         || CLU_().m() != totalNCoarseFaces_
+        )
+        {
+            CLU_.reset
+            (
+                new scalarSquareMatrix(totalNCoarseFaces_, 0.0)
+            );
+        }
+
+        if (pivotIndices_.size() != totalNCoarseFaces_)
+        {
+            pivotIndices_.setSize(totalNCoarseFaces_);
+        }
+    }
 }
 
 
@@ -260,15 +355,20 @@ Foam::radiationModels::viewFactorSky::viewFactorSky(const volScalarField& T)
         ),
         mesh_
     ),
+    viewFactorWorkflow_("sparse"),
     globalFaceFaces_(),
     viewFactors_(),
     localGlobalIds_(),
     qPrev_(),
     qPrevValid_(false),
+    Fmatrix_(),
+    CLU_(),
     selectedPatches_(mesh_.boundary().size(), -1),
     totalNCoarseFaces_(0),
     nLocalCoarseFaces_(0),
     constEmissivity_(false),
+    iterCounter_(0),
+    pivotIndices_(0),
     grassPatches()
 {
     initialise();
@@ -320,15 +420,20 @@ Foam::radiationModels::viewFactorSky::viewFactorSky
         ),
         mesh_
     ),
+    viewFactorWorkflow_("sparse"),
     globalFaceFaces_(),
     viewFactors_(),
     localGlobalIds_(),
     qPrev_(),
     qPrevValid_(false),
+    Fmatrix_(),
+    CLU_(),
     selectedPatches_(mesh_.boundary().size(), -1),
     totalNCoarseFaces_(0),
     nLocalCoarseFaces_(0),
     constEmissivity_(false),
+    iterCounter_(0),
+    pivotIndices_(0),
     grassPatches()
 {
     initialise();
@@ -347,11 +452,39 @@ bool Foam::radiationModels::viewFactorSky::read()
 {
     if (radiationModel::read())
     {
+        readViewFactorWorkflow();
+        constEmissivity_ = readBool(coeffs_.lookup("constantEmissivity"));
+        qPrevValid_ = false;
+        iterCounter_ = 0;
+        ensureDenseStructures();
         return true;
     }
     else
     {
         return false;
+    }
+}
+
+
+void Foam::radiationModels::viewFactorSky::insertMatrixElements
+(
+    const globalIndex& globalNumbering,
+    const label proci,
+    const labelListList& globalFaceFaces,
+    const scalarListList& viewFactors,
+    scalarSquareMatrix& Fmatrix
+)
+{
+    forAll(viewFactors, facei)
+    {
+        const scalarList& vf = viewFactors[facei];
+        const labelList& globalFaces = globalFaceFaces[facei];
+
+        label globalI = globalNumbering.toGlobal(proci, facei);
+        forAll(globalFaces, i)
+        {
+            Fmatrix[globalI][globalFaces[i]] = vf[i];
+        }
     }
 }
 
@@ -648,6 +781,145 @@ const
     }
 
     return x;
+}
+
+
+Foam::scalarField Foam::radiationModels::viewFactorSky::solveViewFactorSystemDense
+(
+    const scalarField& T4,
+    const scalarField& qrExt,
+    const scalarField& E
+)
+{
+    ensureDenseStructures();
+
+    scalarField q(totalNCoarseFaces_, 0.0);
+
+    if (!Pstream::master())
+    {
+        return q;
+    }
+
+    if (!constEmissivity_)
+    {
+        scalarSquareMatrix C(totalNCoarseFaces_, 0.0);
+
+        for (label i = 0; i < totalNCoarseFaces_; i++)
+        {
+            for (label j = 0; j < totalNCoarseFaces_; j++)
+            {
+                const scalar invEj = 1.0/E[j];
+                const scalar sigmaT4 =
+                    constant::physicoChemical::sigma.value()*T4[j];
+
+                if (i == j)
+                {
+                    C(i, j) = invEj - (invEj - 1.0)*Fmatrix_()(i, j);
+                    q[i] +=
+                        (Fmatrix_()(i, j) - 1.0)*sigmaT4 - qrExt[j];
+                }
+                else
+                {
+                    C(i, j) = (1.0 - invEj)*Fmatrix_()(i, j);
+                    q[i] += Fmatrix_()(i, j)*sigmaT4;
+                }
+            }
+        }
+
+        Info<< "\nSolving dense view factor equations..." << endl;
+        LUsolve(C, q);
+    }
+    else
+    {
+        if (iterCounter_ == 0)
+        {
+            for (label i = 0; i < totalNCoarseFaces_; i++)
+            {
+                for (label j = 0; j < totalNCoarseFaces_; j++)
+                {
+                    const scalar invEj = 1.0/E[j];
+                    if (i == j)
+                    {
+                        CLU_()(i, j) =
+                            invEj - (invEj - 1.0)*Fmatrix_()(i, j);
+                    }
+                    else
+                    {
+                        CLU_()(i, j) = (1.0 - invEj)*Fmatrix_()(i, j);
+                    }
+                }
+            }
+
+            fileName fileCLU
+            (
+                mesh_.time().rootPath()
+               /mesh_.time().globalCaseName()
+               /"processor0/CLU_qr"
+            );
+
+            IFstream is(fileCLU);
+            label testCLU = -1;
+            if (is.good())
+            {
+                is >> testCLU;
+                if (testCLU == totalNCoarseFaces_)
+                {
+                    is >> CLU_() >> pivotIndices_;
+                    Info<< "Read decomposed C matrix from existing file!" << endl;
+                }
+                else
+                {
+                    testCLU = -1;
+                    Info<< "Warning: File for decomposed C matrix does not "
+                        << "match totalNCoarseFaces! Will decompose C matrix "
+                        << "again..." << endl;
+                }
+            }
+
+            if (testCLU == -1)
+            {
+                Info<< "\nDecomposing dense C matrix..." << endl;
+                LUDecompose(CLU_(), pivotIndices_);
+
+                if (Pstream::nProcs() > 1)
+                {
+                    OFstream os(fileCLU);
+                    os << totalNCoarseFaces_ << endl;
+                    os << CLU_() << endl;
+                    os << pivotIndices_ << endl;
+                }
+            }
+        }
+
+        for (label i = 0; i < totalNCoarseFaces_; i++)
+        {
+            for (label j = 0; j < totalNCoarseFaces_; j++)
+            {
+                const scalar sigmaT4 =
+                    constant::physicoChemical::sigma.value()*T4[j];
+
+                if (i == j)
+                {
+                    q[i] +=
+                        (Fmatrix_()(i, j) - 1.0)*sigmaT4 - qrExt[j];
+                }
+                else
+                {
+                    q[i] += Fmatrix_()(i, j)*sigmaT4;
+                }
+            }
+        }
+
+        if (debug)
+        {
+            InfoInFunction << "\nLU Back substitute dense C matrix.." << endl;
+        }
+
+        LUBacksubstitute(CLU_(), pivotIndices_, q);
+        iterCounter_++;
+    }
+
+    return q;
 }
 
 
@@ -1074,8 +1346,18 @@ void Foam::radiationModels::viewFactorSky::calculate()
     }
     assembleGlobal(b);
 
-    scalarField q(solveViewFactorSystem(b, E));
-    referenceCheck(q, b, E);
+    scalarField q(totalNCoarseFaces_, 0.0);
+    if (viewFactorWorkflow_ == "dense")
+    {
+        q = solveViewFactorSystemDense(T4, qrExt, E);
+        Pstream::listCombineScatter(q);
+        Pstream::listCombineGather(q, maxEqOp<scalar>());
+    }
+    else
+    {
+        q = solveViewFactorSystem(b, E);
+        referenceCheck(q, b, E);
+    }
 
     label globCoarseId = 0;
     forAll(selectedPatches_, i)
