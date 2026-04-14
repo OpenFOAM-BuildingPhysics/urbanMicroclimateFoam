@@ -9,4 +9,4 @@ LIB_LIBS = \
     -lfiniteVolume \
     -lfluidThermophysicalModels \
     -lradiationModels \
-    -lmeshTools
+    -lmeshTools 

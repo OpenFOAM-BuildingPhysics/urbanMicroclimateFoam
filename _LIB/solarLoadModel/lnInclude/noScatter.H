@@ -1,1 +1,0 @@
-../submodels/scatterModel/noScatter/noScatter.H

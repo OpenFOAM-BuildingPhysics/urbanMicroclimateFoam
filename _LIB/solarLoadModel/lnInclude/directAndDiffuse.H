@@ -1,1 +1,0 @@
-../directAndDiffuse/directAndDiffuse.H

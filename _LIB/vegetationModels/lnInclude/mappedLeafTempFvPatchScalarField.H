@@ -1,1 +1,0 @@
-../derivedFvPatchFields/mappedLeafTemperature/mappedLeafTempFvPatchScalarField.H

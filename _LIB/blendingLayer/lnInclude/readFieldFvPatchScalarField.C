@@ -1,1 +1,0 @@
-../derivedFvPatchFields/readScalarField/readFieldFvPatchScalarField.C

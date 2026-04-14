@@ -55,9 +55,7 @@ mappedLeafTempFvPatchScalarField
 :
     fixedValueFvPatchScalarField(p, iF, dict),
     fieldName_(dict.lookupOrDefault<word>("field", iF.name()))
-    //v8: mapperPtr_(mappedPatchBase::specified(dict) ? new mappedPatchBase(...) : nullptr)
 {
-    //v12: mappedInternal uses mappedInternalPatchBase, not mappedPatchBase
     if (!isA<mappedInternalPatchBase>(p.patch()))
     {
         FatalIOErrorInFunction(dict)
@@ -79,7 +77,6 @@ mappedLeafTempFvPatchScalarField
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
     fieldName_(ptf.fieldName_)
-    //v8: mapperPtr_(ptf.mapperPtr_.valid() ? new mappedPatchBase(...) : nullptr)
 {}
 
 
@@ -92,21 +89,11 @@ mappedLeafTempFvPatchScalarField
 :
     fixedValueFvPatchScalarField(ptf, iF),
     fieldName_(ptf.fieldName_)
-    //v8: mapperPtr_(ptf.mapperPtr_.valid() ? new mappedPatchBase(...) : nullptr)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-//v8: const Foam::mappedPatchBase& Foam::mappedLeafTempFvPatchScalarField::mapper() const
-//v8: {
-//v8:     return
-//v8:         mapperPtr_.valid()
-//v8:       ? mapperPtr_()
-//v8:       : mappedPatchBase::getMap(this->patch().patch());
-//v8: }
-
-//v12: mappedInternal uses mappedInternalPatchBase (cell-based, not patch-based)
 const Foam::mappedInternalPatchBase&
 Foam::mappedLeafTempFvPatchScalarField::mapper() const
 {
@@ -121,46 +108,27 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
         return;
     }
 
-    // Get the mapper and the neighbouring mesh
-    //v8: const mappedPatchBase& mpp = this->mapper();
-    //v8: const polyMesh& nbrMesh = mpp.sampleMesh();
-    //v8: const fvPatch& nbrPatch =
-    //v8:     refCast<const fvMesh>(nbrMesh).boundary()[mpp.samplePolyPatch().index()];
-    //v8: scalarField tnbrIntFld = nbrPatch.lookupPatchField<volScalarField, scalar>(fieldName_);
-    //v8: mpp.distribute(tnbrIntFld);
+    const int oldTag = UPstream::msgType();
+    UPstream::msgType() = oldTag + 1;
 
-    //v12: mappedInternal distributes internal cell values to this patch
     const mappedInternalPatchBase& mipb = this->mapper();
-    const fvMesh& nbrMesh = refCast<const fvMesh>(mipb.nbrMesh());
-    const volScalarField& nbrField =
-        nbrMesh.lookupObject<volScalarField>(fieldName_);
-
-    // Distribute cell values from air region to vegetation patch faces
-    tmp<scalarField> tnbrIntFld = mipb.distribute(nbrField);
-
-    this->operator==(tnbrIntFld);
-
-    //this->operator==(this->mappedField());
-
-    //The default nearestCell mapping will sometimes map from a cell with Tl = 0
-    //Replaced with the part below based on Foam::meshSearch::findNearestCellLinear function
-    //but we are searching only within the cells where Tl is defined
-
-    const fvMesh& airMesh = this->sampleField().mesh();
+    const fvMesh& airMesh = refCast<const fvMesh>(mipb.nbrMesh());
     const volScalarField& Tl = airMesh.lookupObject<volScalarField>("Tl");
     const volScalarField& LAD = airMesh.lookupObject<volScalarField>("LAD");
-    scalar Tl_avg = gSum(Tl.primitiveField()*LAD.primitiveField())/gSum(LAD.primitiveField());
 
     scalarField& Tp = *this;
 
     List<List<point>> vegCellCentres(Pstream::nProcs());
     List<List<scalar>> vegCellValues(Pstream::nProcs());
-    forAll(Tl.internalField(), cellI)
+    const scalarField& TlI = Tl.primitiveField();
+    const scalarField& LADI = LAD.primitiveField();
+    const vectorField& CI = airMesh.cellCentres();
+    forAll(TlI, cellI)
     {
-        if (Tl.internalField()[cellI] > 0)
+        if (LADI[cellI] > 0 && TlI[cellI] > 0)
         {
-            vegCellCentres[Pstream::myProcNo()].append(airMesh.cellCentres()[cellI]);
-            vegCellValues[Pstream::myProcNo()].append(Tl.internalField()[cellI]);
+            vegCellCentres[Pstream::myProcNo()].append(CI[cellI]);
+            vegCellValues[Pstream::myProcNo()].append(TlI[cellI]);
         }
     }
     Pstream::gatherList(vegCellCentres);
@@ -199,6 +167,8 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
         Tp[i] = nearest[i].second();
     }
 
+    UPstream::msgType() = oldTag;
+
     fixedValueFvPatchScalarField::updateCoeffs();
 }
 
@@ -207,7 +177,6 @@ void Foam::mappedLeafTempFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
     writeEntry(os, "field", fieldName_);
-    //v8: if (mapperPtr_.valid()) { mapperPtr_->write(os); }
     writeEntry(os, "value", *this);
 }
 

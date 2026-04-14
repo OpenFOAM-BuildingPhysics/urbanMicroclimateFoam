@@ -1,1 +1,0 @@
-../noSolarLoad/noSolarLoad.C

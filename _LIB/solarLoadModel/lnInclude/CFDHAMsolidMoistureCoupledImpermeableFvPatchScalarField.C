@@ -1,1 +1,0 @@
-../derivedFvPatchFields/CFDHAMsolidMoistureCoupledImpermeable/CFDHAMsolidMoistureCoupledImpermeableFvPatchScalarField.C

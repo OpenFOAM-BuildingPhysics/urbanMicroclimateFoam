@@ -1,1 +1,0 @@
-../submodels/scatterModel/solarLoadScatterModel/solarLoadScatterModelNew.C

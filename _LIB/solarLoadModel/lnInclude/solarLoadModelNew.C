@@ -1,1 +1,0 @@
-../solarLoadModel/solarLoadModelNew.C

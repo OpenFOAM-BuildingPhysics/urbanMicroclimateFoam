@@ -67,7 +67,7 @@ else if(timeStepDecrease == true) //time step is decreased
         IOobject
         (
             "pc_dump",
-            runTime.timeName(),
+            runTime.name(),
             solidRegions[i],
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -81,7 +81,7 @@ else if(timeStepDecrease == true) //time step is decreased
         IOobject
         (
             "Ts_dump",
-            runTime.timeName(),
+            runTime.name(),
             solidRegions[i],
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -95,7 +95,7 @@ else if(timeStepDecrease == true) //time step is decreased
         IOobject
         (
             "ws_dump",
-            runTime.timeName(),
+            runTime.name(),
             solidRegions[i],
             IOobject::NO_READ,
             IOobject::NO_WRITE
@@ -109,7 +109,7 @@ else if(timeStepDecrease == true) //time step is decreased
         IOobject
         (
             "Crel_dump",
-            runTime.timeName(),
+            runTime.name(),
             solidRegions[i],
             IOobject::NO_READ,
             IOobject::NO_WRITE

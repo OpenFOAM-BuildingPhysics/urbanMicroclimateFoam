@@ -1,1 +1,0 @@
-../viewFactorSky/viewFactorSky.C
