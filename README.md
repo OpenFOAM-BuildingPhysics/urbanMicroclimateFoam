@@ -10,7 +10,7 @@ urbanMicroclimateFoam is a multi-region solver consisting of an air subdomain to
 
 The solver is tested for the following OpenFOAM versions:
 
-* OpenFOAM-org (OpenFOAM Foundation) v6, v7, v8
+* OpenFOAM-org (OpenFOAM Foundation) v6, v7, v8, v12
 
 ### Usage
 
