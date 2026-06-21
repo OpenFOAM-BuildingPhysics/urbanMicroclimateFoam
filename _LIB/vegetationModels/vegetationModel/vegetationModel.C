@@ -46,13 +46,16 @@ Foam::IOobject Foam::vegetation::vegetationModel::createIOobject
     const fvMesh& mesh
 ) const
 {
-    IOobject io
+    typeIOobject<IOdictionary> io
     (
-        "vegetationProperties",
-        mesh.time().constant(),
-        mesh,
-        IOobject::MUST_READ,
-        IOobject::NO_WRITE
+        IOobject
+        (
+            "vegetationProperties",
+            mesh.time().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
     );
 
     if (io.headerOk())

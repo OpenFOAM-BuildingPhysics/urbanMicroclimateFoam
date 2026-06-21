@@ -34,14 +34,17 @@ Foam::vegetation::vegetationModel::New
     const volScalarField& T
 )
 {
-    IOobject vegetationIO
+    typeIOobject<IOdictionary> vegetationIO
     (
-        "vegetationProperties",
-        T.time().constant(),
-        T.mesh(),
-        IOobject::MUST_READ_IF_MODIFIED,
-        IOobject::NO_WRITE,
-        false
+        IOobject
+        (
+            "vegetationProperties",
+            T.time().constant(),
+            T.mesh(),
+            IOobject::MUST_READ_IF_MODIFIED,
+            IOobject::NO_WRITE,
+            false
+        )
     );
 
     word modelType("none");

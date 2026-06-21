@@ -10,9 +10,14 @@
       ==
         gra.Sw()
       + veg.Sq() // vegetation energy source term
+      + fvModels.source(rho, w)
     );
     wEqn.relax();
 
+    fvConstraints.constrain(wEqn);
+
     wEqn.solve();
+
+    fvConstraints.constrain(w);
 
 }

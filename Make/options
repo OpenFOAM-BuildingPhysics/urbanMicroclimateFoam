@@ -8,6 +8,7 @@ EXE_INC = \
     -I_LIB/simpleControlFluid/lnInclude \
     -I_LIB/blendingLayer/lnInclude \
     -I_LIB/vegetationModels/lnInclude \
+    -I_LIB/turbulenceModels/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
@@ -29,6 +30,7 @@ EXE_LIBS = \
     -lsimpleControlFluid \
     -lblendingLayer \
     -lvegetationModels \
+    -lporousCompressibleRASModels \
     -lfiniteVolume \
     -lfluidThermoThermophysicalTransportModels \
     -lfluidThermophysicalTransportModel \

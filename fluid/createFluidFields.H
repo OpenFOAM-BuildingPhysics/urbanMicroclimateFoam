@@ -59,14 +59,17 @@ forAll(fluidRegions, i)
 
     // Check if radiationProperties exists; if not, use noRadiation
     {
-        IOobject radIO
+        typeIOobject<IOdictionary> radIO
         (
-            "radiationProperties",
-            runTime.constant(),
-            fluidRegions[i],
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE,
-            false
+            IOobject
+            (
+                "radiationProperties",
+                runTime.constant(),
+                fluidRegions[i],
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            )
         );
 
         if (radIO.headerOk())

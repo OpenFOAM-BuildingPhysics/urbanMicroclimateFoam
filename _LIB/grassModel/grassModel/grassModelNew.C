@@ -34,14 +34,17 @@ Foam::grass::grassModel::New
     const volScalarField& T
 )
 {
-    IOobject grassIO
+    typeIOobject<IOdictionary> grassIO
     (
-        "grassProperties",
-        T.time().constant(),
-        T.mesh(),
-        IOobject::MUST_READ_IF_MODIFIED,
-        IOobject::NO_WRITE,
-        false
+        IOobject
+        (
+            "grassProperties",
+            T.time().constant(),
+            T.mesh(),
+            IOobject::MUST_READ_IF_MODIFIED,
+            IOobject::NO_WRITE,
+            false
+        )
     );
 
     word modelType("none");

@@ -46,13 +46,20 @@ Foam::IOobject Foam::grass::grassModel::createIOobject
     const fvMesh& mesh
 ) const
 {
-    IOobject io
+    // typeIOobject<IOdictionary>::headerOk() searches the global (case-level)
+    // path in parallel; a plain IOobject probes processorN/constant and fails,
+    // selecting NO_READ on every rank so the IOdictionary stays empty and the
+    // <model>Coeffs subdict loses its keys, triggering "keyword ... undefined".
+    typeIOobject<IOdictionary> io
     (
-        "grassProperties",
-        mesh.time().constant(),
-        mesh,
-        IOobject::MUST_READ,
-        IOobject::NO_WRITE
+        IOobject
+        (
+            "grassProperties",
+            mesh.time().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
     );
 
     if (io.headerOk())

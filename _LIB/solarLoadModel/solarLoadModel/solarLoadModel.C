@@ -49,13 +49,16 @@ Foam::IOobject Foam::solarLoad::solarLoadModel::createIOobject
     const fvMesh& mesh
 ) const
 {
-    IOobject io
+    typeIOobject<IOdictionary> io
     (
-        "solarLoadProperties",
-        mesh.time().constant(),
-        mesh,
-        IOobject::MUST_READ,
-        IOobject::NO_WRITE
+        IOobject
+        (
+            "solarLoadProperties",
+            mesh.time().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
     );
 
     if (io.headerOk())

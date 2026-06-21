@@ -478,8 +478,9 @@ void Foam::radiationModels::viewFactorSky::calculate()
     
     //////////////////////////////////////////////////////////////////////////
     //is grass model activated?
-    const polyMesh& airMesh =
-        mesh_.time().lookupObject<polyMesh>("air");
+    // mesh_ is already the fluid (air) region mesh; avoid a hardcoded "air"
+    // registry lookup that would abort if the fluid region is renamed
+    const polyMesh& airMesh = mesh_;
     IOdictionary grassProperties
     (
         IOobject
@@ -491,7 +492,9 @@ void Foam::radiationModels::viewFactorSky::calculate()
             IOobject::NO_WRITE
         )
     );
-    if (grassProperties.headerOk())
+    // global-aware existence probe: bare IOdictionary::headerOk() resolves
+    // the processor-local path and would silently disable grass in parallel
+    if (typeIOobject<IOdictionary>(grassProperties).headerOk())
     {
         word grassModel(grassProperties.lookup("grassModel"));
         if (grassModel != "none")

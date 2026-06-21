@@ -194,21 +194,15 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
 
     scalarField& Tp = *this;
 
-    const mixedFvPatchScalarField&
-        nbrField = refCast
-            <const mixedFvPatchScalarField>
-            (
-                nbrPatch.lookupPatchField<volScalarField, scalar>("T")
-            );
+    // base-class ref suffices: patchInternalField() is an fvPatchField method,
+    // so this no longer aborts if the neighbour T BC is not a mixed type
+    const fvPatchScalarField& nbrField =
+        nbrPatch.lookupPatchField<volScalarField, scalar>("T");
     tmp<scalarField> TcNbr = mapper.fromNeighbour(nbrField.patchInternalField());
     tmp<scalarField> TNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("T"));
 
-    const mixedFvPatchScalarField&
-        nbrFieldw = refCast
-            <const mixedFvPatchScalarField>
-            (
-                nbrPatch.lookupPatchField<volScalarField, scalar>("w")
-            );
+    const fvPatchScalarField& nbrFieldw =
+        nbrPatch.lookupPatchField<volScalarField, scalar>("w");
     tmp<scalarField> wcNbr = mapper.fromNeighbour(nbrFieldw.patchInternalField());
     scalarField wNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("w");
     scalarField rhoNbr_local = nbrPatch.lookupPatchField<volScalarField, scalar>("rho");
@@ -468,7 +462,8 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
         )
     );
 
-    if (grassProperties.headerOk())
+    // global-aware existence probe: bare IOdictionary::headerOk() resolves
+    if (typeIOobject<IOdictionary>(grassProperties).headerOk())
     {
         word grassModel(grassProperties.lookup("grassModel"));
         if (grassModel != "none")

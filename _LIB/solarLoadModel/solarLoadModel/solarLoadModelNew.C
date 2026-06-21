@@ -34,14 +34,17 @@ Foam::solarLoad::solarLoadModel::New
     const volScalarField& T
 )
 {
-    IOobject solIO
+    typeIOobject<IOdictionary> solIO
     (
-        "solarLoadProperties",
-        T.time().constant(),
-        T.mesh(),
-        IOobject::MUST_READ_IF_MODIFIED,
-        IOobject::NO_WRITE,
-        false
+        IOobject
+        (
+            "solarLoadProperties",
+            T.time().constant(),
+            T.mesh(),
+            IOobject::MUST_READ_IF_MODIFIED,
+            IOobject::NO_WRITE,
+            false
+        )
     );
 
     word modelType("none");

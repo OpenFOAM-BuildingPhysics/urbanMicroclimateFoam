@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
        IOobject
        (
             "viewFactorsDict",
-            runTime.constant(),
+            runTime.system(),  // read from system/<region>/ for consistency with viewFactorsGen
             mesh,
             IOobject::MUST_READ_IF_MODIFIED,
             IOobject::NO_WRITE

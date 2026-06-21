@@ -163,8 +163,13 @@ void Foam::mappedLeafTempFvPatchScalarField::updateCoeffs()
             }
         }
 
-        //update value
-        Tp[i] = nearest[i].second();
+        //update value (only when a canopy cell was actually found; otherwise
+        //keep the current value to avoid writing 'great' when no LAD>0/Tl>0
+        //cells exist globally yet, e.g. before the first vegetation solve)
+        if (nearest[i].first() < great)
+        {
+            Tp[i] = nearest[i].second();
+        }
     }
 
     UPstream::msgType() = oldTag;
