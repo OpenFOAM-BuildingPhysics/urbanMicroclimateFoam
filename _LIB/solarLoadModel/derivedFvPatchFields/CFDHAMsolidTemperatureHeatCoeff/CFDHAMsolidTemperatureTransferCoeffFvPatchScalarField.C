@@ -410,12 +410,19 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
             //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
             //v12: direct solid→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
             //     fromNeighbour maps veg field directly onto solid patch faces
+            // Constructed from a dictionary so the geometric-similarity check
+            // runs with a relaxed matchTolerance (the components constructor
+            // pins it to the 1e-4 default, which rejects solid<->vegetation
+            // patch pairs on real urban geometry).
+            dictionary directMapperDict;
+            directMapperDict.add("neighbourRegion", vegiRegion);
+            directMapperDict.add("neighbourPatch", nbrPatchName);
+            directMapperDict.add("matchTolerance", 0.1);
             const mappedPatchBase directMapper
             (
                 patch().patch(),
-                vegiRegion,
-                nbrPatchName,
-                cyclicTransform()
+                directMapperDict,
+                true
             );
 
             if (qrNbrName_ != "none")
