@@ -405,17 +405,15 @@ void CFDHAMsolidTemperatureTransferCoeffFvPatchScalarField::updateCoeffs()
             const fvPatch& vegiNbrPatch =
                 refCast<const fvMesh>(vegiMesh).boundary()[patchi];
 
-            //v8: constructed ad-hoc mappedPatchBase from solid to vegetation
-            //v8: const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), 0);
-            //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
-            //v12: direct solid→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
-            //     fromNeighbour maps veg field directly onto solid patch faces
+            dictionary directMapperDict;
+            directMapperDict.add("neighbourRegion", vegiRegion);
+            directMapperDict.add("neighbourPatch", nbrPatchName);
+            directMapperDict.add("matchTolerance", 0.05);
             const mappedPatchBase directMapper
             (
                 patch().patch(),
-                vegiRegion,
-                nbrPatchName,
-                cyclicTransform()
+                directMapperDict,
+                true
             );
 
             if (qrNbrName_ != "none")

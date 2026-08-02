@@ -799,18 +799,44 @@ int main(int argc, char *argv[])
         IOobject
         (
             "kcLAIboundary",
-            runTime.constant(),
+            mesh.facesInstance(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
+            IOobject::NO_WRITE,
+            false
         )
-    );   
+    );  
     if (vegNames.size()>0 && !kcLAIboundaryList.headerOk())
     {
         FatalErrorInFunction
             << "File kcLAIboundary not found! Did you not run calcLAI before?"
             << exit(FatalError);
-    }        
+    }      
+
+    if (vegNames.size()>0)
+    {
+        if (kcLAIboundaryList.size() != sunPosVector_y.size())
+        {
+            FatalErrorInFunction
+                << "kcLAIboundary holds " << kcLAIboundaryList.size()
+                << " sun directions, expected " << sunPosVector_y.size()
+                << ". Re-run calcLAI with the same sunPosVector."
+                << exit(FatalError);
+        }
+        forAll(kcLAIboundaryList, vectorId)
+        {
+            if (kcLAIboundaryList[vectorId].size() != nCoarseFacesAll)
+            {
+                FatalErrorInFunction
+                    << "kcLAIboundary[" << vectorId << "] holds "
+                    << kcLAIboundaryList[vectorId].size()
+                    << " coarse faces, expected " << nCoarseFacesAll
+                    << ". calcLAI patch selection or decomposition does not "
+                    << "match this utility."
+                    << exit(FatalError);
+            }
+        }
+    }
 
     forAll(sunPosVector_y, vectorId)
     {    

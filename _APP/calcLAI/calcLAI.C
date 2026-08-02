@@ -234,6 +234,14 @@ void interpfvMeshToCartesian
 
     dp = vector(minCellL,minCellL,minCellL); // grid spacing
 
+    if (gMax(LAD) <= 10*SMALL)
+    {
+        FatalErrorInFunction
+            << "No vegetation found: LAD is zero everywhere. Run topoSet and "
+            << "setFields to initialise LAD before calcLAI."
+            << exit(FatalError);
+    }
+
     // Extend the cartesian grid to include vegetation
     pmin -= 5*dp;
     pmax += 5*dp;
@@ -242,6 +250,16 @@ void interpfvMeshToCartesian
     nx = ceil( (pmax.x()-pmin.x()) / dp.x()) + 1;
     ny = ceil( (pmax.y()-pmin.y()) / dp.y()) + 1;
     nz = ceil( (pmax.z()-pmin.z()) / dp.z()) + 1;
+
+    // nx*ny*nz indexes a scalarField, so it must fit a label
+    if (scalar(nx)*scalar(ny)*scalar(nz) > scalar(labelMax))
+    {
+        FatalErrorInFunction
+            << "Cartesian grid " << nx << " x " << ny << " x " << nz
+            << " exceeds the maximum label " << labelMax
+            << ". Increase minCellSizeFactor in vegetationProperties."
+            << exit(FatalError);
+    }
 
     // Generate cartesian interpolation grid
     // coordinates
@@ -341,6 +359,15 @@ void interpcartesianToRotCartesian
     nxRot = ceil( (pmaxRot.x()-pminRot.x()) / dp.x()) + 1;
     nyRot = ceil( (pmaxRot.y()-pminRot.y()) / dp.y()) + 1;
     nzRot = ceil( (pmaxRot.z()-pminRot.z()) / dp.z()) + 1;
+
+    if (scalar(nxRot)*scalar(nyRot)*scalar(nzRot) > scalar(labelMax))
+    {
+        FatalErrorInFunction
+            << "Rotated cartesian grid " << nxRot << " x " << nyRot << " x "
+            << nzRot << " exceeds the maximum label " << labelMax
+            << ". Increase minCellSizeFactor in vegetationProperties."
+            << exit(FatalError);
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Interpolate onto rotated cartesian grid
