@@ -183,34 +183,6 @@ void Foam::distributedTriSurfaceMeshBugFix::distributeSegment
     List<DynamicList<label>>& sendMap
 ) const
 {
-    // 1. Fully local already handled outside. Note: retest is cheap.
-    if (isLocal(procBb_[Pstream::myProcNo()], start, end))
-    {
-        return;
-    }
-
-
-    // 2. If fully inside one other processor, then only need to send
-    // to that one processor even if it intersects another. Rare occurrence
-    // but cheap to test.
-    forAll(procBb_, proci)
-    {
-        if (proci != Pstream::myProcNo())
-        {
-            const List<treeBoundBox>& bbs = procBb_[proci];
-
-            if (isLocal(bbs, start, end))
-            {
-                sendMap[proci].append(allSegments.size());
-                allSegmentMap.append(segmentI);
-                allSegments.append(segment(start, end));
-                return;
-            }
-        }
-    }
-
-    // 3. If not contained in single processor send to all intersecting
-    // processors.
     forAll(procBb_, proci)
     {
         const List<treeBoundBox>& bbs = procBb_[proci];
@@ -218,11 +190,6 @@ void Foam::distributedTriSurfaceMeshBugFix::distributeSegment
         forAll(bbs, bbI)
         {
             const treeBoundBox& bb = bbs[bbI];
-
-            // Scheme a: any processor that intersects the segment gets
-            // the segment.
-
-            // Intersection point
             point clipPt;
 
             if (bb.intersects(start, end, clipPt))
@@ -233,8 +200,7 @@ void Foam::distributedTriSurfaceMeshBugFix::distributeSegment
             }
 
             // Alternative: any processor only gets clipped bit of
-            // segment. This gives small problems with additional
-            // truncation errors.
+            // segment. 
             // splitSegment
             //(
             //    segmentI,
@@ -261,21 +227,11 @@ Foam::distributedTriSurfaceMeshBugFix::distributeSegments
     labelList& allSegmentMap
 ) const
 {
-    // Determine send map
-    // ~~~~~~~~~~~~~~~~~~
-
     labelListList sendMap(Pstream::nProcs());
 
     {
-        // Since intersection test is quite expensive compared to memory
-        // allocation we use DynamicList to immediately store the segment
-        // in the correct bin.
-
-        // Segments to test
         DynamicList<segment> dynAllSegments(start.size());
-        // Original index of segment
         DynamicList<label> dynAllSegmentMap(start.size());
-        // Per processor indices into allSegments to send
         List<DynamicList<label>> dynSendMap(Pstream::nProcs());
 
         forAll(start, segmentI)
@@ -292,7 +248,6 @@ Foam::distributedTriSurfaceMeshBugFix::distributeSegments
             );
         }
 
-        // Convert dynamicList to labelList
         sendMap.setSize(Pstream::nProcs());
         forAll(sendMap, proci)
         {
@@ -304,8 +259,6 @@ Foam::distributedTriSurfaceMeshBugFix::distributeSegments
         allSegmentMap.transfer(dynAllSegmentMap.shrink());
     }
 
-
-    // Send over how many I need to receive.
     labelListList sendSizes(Pstream::nProcs());
     sendSizes[Pstream::myProcNo()].setSize(Pstream::nProcs());
     forAll(sendMap, proci)
@@ -316,10 +269,7 @@ Foam::distributedTriSurfaceMeshBugFix::distributeSegments
     Pstream::scatterList(sendSizes);
 
 
-    // Determine order of receiving
     labelListList constructMap(Pstream::nProcs());
-
-    // My local segments first
     constructMap[Pstream::myProcNo()] = identityMap
     (
         sendMap[Pstream::myProcNo()].size()
@@ -363,7 +313,6 @@ void Foam::distributedTriSurfaceMeshBugFix::findLine
 {
     const indexedOctree<treeDataTriSurface>& octree = tree();
 
-    // Initialise
     info.setSize(start.size());
     forAll(info, i)
     {
@@ -386,56 +335,11 @@ void Foam::distributedTriSurfaceMeshBugFix::findLine
     }
     else
     {
-        // Important:force synchronised construction of indexing
         const globalIndex& triIndexer = globalTris();
-
-
-        // Do any local queries
-        // ~~~~~~~~~~~~~~~~~~~~
-
-        label nLocal = 0;
-
-        forAll(start, i)
-        {
-            if (isLocal(procBb_[Pstream::myProcNo()], start[i], end[i]))
-            {
-                if (nearestIntersection)
-                {
-                    info[i] = octree.findLine(start[i], end[i]);
-                }
-                else
-                {
-                    info[i] = octree.findLineAny(start[i], end[i]);
-                }
-
-                if (info[i].hit())
-                {
-                    info[i].setIndex(triIndexer.toGlobal(info[i].index()));
-                }
-                nLocal++;
-            }
-        }
-
-
-        if
-        (
-            returnReduce(nLocal, sumOp<label>())
-          < returnReduce(start.size(), sumOp<label>())
-        )
-        {
-            // Not all can be resolved locally. Build segments and map,
-            // send over segments, do intersections, send back and merge.
-
-
-        // Construct queries (segments)
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        // Segments to test
         List<segment> allSegments(start.size());
-        // Original index of segment
         labelList allSegmentMap(start.size());
 
-            const autoPtr<distributionMap> mapPtr
+        const autoPtr<distributionMap> mapPtr
         (
             distributeSegments
             (
@@ -445,21 +349,12 @@ void Foam::distributedTriSurfaceMeshBugFix::findLine
                 allSegmentMap
             )
         );
-            const distributionMap& map = mapPtr();
+        const distributionMap& map = mapPtr();
 
         label nOldAllSegments = allSegments.size();
 
 
-        // Exchange the segments
-        // ~~~~~~~~~~~~~~~~~~~~~
-
         map.distribute(allSegments);
-
-
-        // Do tests I need to do
-        // ~~~~~~~~~~~~~~~~~~~~~
-
-        // Intersections
         List<pointIndexHit> intersections(allSegments.size());
 
         forAll(allSegments, i)
@@ -493,14 +388,9 @@ void Foam::distributedTriSurfaceMeshBugFix::findLine
 
 
         // Exchange the intersections (opposite to segments)
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
         map.reverseDistribute(nOldAllSegments, intersections);
 
-
         // Extract the hits
-        // ~~~~~~~~~~~~~~~~
-
         forAll(intersections, i)
         {
             const pointIndexHit& allInfo = intersections[i];
@@ -524,14 +414,12 @@ void Foam::distributedTriSurfaceMeshBugFix::findLine
                     )
                     {
                         hitInfo = allInfo;
-                        }
                     }
                 }
             }
         }
     }
 }
-
 
 // Exchanges indices to the processor they come from.
 // - calculates exchange map
@@ -549,12 +437,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
 
 
     // Determine send map
-    // ~~~~~~~~~~~~~~~~~~
-
-    // Since determining which processor the query should go to is
-    // cheap we do a multi-pass algorithm to save some memory temporarily.
-
-    // 1. Count
     labelList nSend(Pstream::nProcs(), 0);
 
     forAll(info, i)
@@ -566,7 +448,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
         }
     }
 
-    // 2. Size sendMap
     labelListList sendMap(Pstream::nProcs());
     forAll(nSend, proci)
     {
@@ -574,7 +455,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
         nSend[proci] = 0;
     }
 
-    // 3. Fill sendMap
     forAll(info, i)
     {
         if (info[i].hit())
@@ -589,10 +469,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
         }
     }
 
-
-    // Send over how many I need to receive
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     labelListList sendSizes(Pstream::nProcs());
     sendSizes[Pstream::myProcNo()].setSize(Pstream::nProcs());
     forAll(sendMap, proci)
@@ -602,13 +478,8 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
     Pstream::gatherList(sendSizes);
     Pstream::scatterList(sendSizes);
 
-
-    // Determine receive map
-    // ~~~~~~~~~~~~~~~~~~~~~
-
     labelListList constructMap(Pstream::nProcs());
 
-    // My local segments first
     constructMap[Pstream::myProcNo()] = identityMap
     (
         sendMap[Pstream::myProcNo()].size()
@@ -619,20 +490,14 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
     {
         if (proci != Pstream::myProcNo())
         {
-            // What I need to receive is what other processor is sending to me.
             label nRecv = sendSizes[proci][Pstream::myProcNo()];
             constructMap[proci].setSize(nRecv);
-
             for (label i = 0; i < nRecv; i++)
             {
                 constructMap[proci][i] = segmentI++;
             }
         }
     }
-
-
-    // Pack into distribution map
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     autoPtr<distributionMap> mapPtr
     (
@@ -646,12 +511,7 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
     const distributionMap& map = mapPtr();
 
 
-    // Send over queries
-    // ~~~~~~~~~~~~~~~~~
-
     map.distribute(triangleIndex);
-
-
     return mapPtr;
 }
 
@@ -699,25 +559,18 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
 ) const
 {
     // Determine queries
-    // ~~~~~~~~~~~~~~~~~
-
     labelListList sendMap(Pstream::nProcs());
 
     {
-        // Queries
         DynamicList<point> dynAllCentres(centres.size());
         DynamicList<scalar> dynAllRadiusSqr(centres.size());
-        // Original index of segment
         DynamicList<label> dynAllSegmentMap(centres.size());
-        // Per processor indices into allSegments to send
         List<DynamicList<label>> dynSendMap(Pstream::nProcs());
 
-        // Work array - whether processor bb overlaps the bounding sphere.
         boolList procBbOverlaps(Pstream::nProcs());
 
         forAll(centres, centreI)
         {
-            // Find the processor this sample+radius overlaps.
             calcOverlappingProcs
             (
                 centres[centreI],
@@ -737,7 +590,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
             }
         }
 
-        // Convert dynamicList to labelList
         sendMap.setSize(Pstream::nProcs());
         forAll(sendMap, proci)
         {
@@ -764,8 +616,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
 
     // Determine order of receiving
     labelListList constructMap(Pstream::nProcs());
-
-    // My local segments first
     constructMap[Pstream::myProcNo()] = identityMap
     (
         sendMap[Pstream::myProcNo()].size()
@@ -776,7 +626,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
     {
         if (proci != Pstream::myProcNo())
         {
-            // What I need to receive is what other processor is sending to me.
             label nRecv = sendSizes[proci][Pstream::myProcNo()];
             constructMap[proci].setSize(nRecv);
 
@@ -799,13 +648,6 @@ Foam::distributedTriSurfaceMeshBugFix::calcLocalQueries
     return mapPtr;
 }
 
-
-// Find bounding boxes that guarantee a more or less uniform distribution
-// of triangles. Decomposition in here is only used to get the bounding
-// boxes, actual decomposition is done later on.
-// Returns a per processor a list of bounding boxes that most accurately
-// describe the shape. For now just a single bounding box per processor but
-// optimisation might be to determine a better fitting shape.
 Foam::List<Foam::List<Foam::treeBoundBox>>
 Foam::distributedTriSurfaceMeshBugFix::independentlyDistributedBbs
 (
@@ -839,16 +681,10 @@ Foam::distributedTriSurfaceMeshBugFix::independentlyDistributedBbs
         triCentres[triI] = s[triI].centre(s.points());
     }
 
-
     decompositionMethods::geometric& distributor =
         refCast<decompositionMethods::geometric>(distributor_());
 
-    // Do the actual decomposition
     labelList distribution(distributor.decompose(triCentres));
-
-    // Find bounding box for all triangles on new distribution.
-
-    // Initialise to inverted box (vGreat, -vGreat)
     List<List<treeBoundBox>> bbs(Pstream::nProcs());
     forAll(bbs, proci)
     {
@@ -872,7 +708,6 @@ Foam::distributedTriSurfaceMeshBugFix::independentlyDistributedBbs
         }
     }
 
-    // Now combine for all processors and convert to correct format.
     forAll(bbs, proci)
     {
         forAll(bbs[proci], i)
@@ -905,22 +740,14 @@ bool Foam::distributedTriSurfaceMeshBugFix::overlaps
         triBb.max() = max(triBb.max(), p1);
         triBb.max() = max(triBb.max(), p2);
 
-        // Exact test of triangle intersecting bb
-
-        // Quick rejection. If whole bounding box of tri is outside cubeBb then
-        // there will be no intersection.
         if (bb.overlaps(triBb))
         {
-            // Check if one or more triangle point inside
             if (bb.contains(p0) || bb.contains(p1) || bb.contains(p2))
             {
                 // One or more points inside
                 return true;
             }
 
-            // Now we have the difficult case: all points are outside but
-            // connecting edges might go through cube. Use fast intersection
-            // of bounding box.
             bool intersect = triangleFuncs::intersectBb(p0, p1, p2, bb);
 
             if (intersect)
@@ -1165,8 +992,6 @@ void Foam::distributedTriSurfaceMeshBugFix::merge
 
 
     // Add all unmatched points
-    // ~~~~~~~~~~~~~~~~~~~~~~~~
-
     label allPointi = nOldAllPoints;
     forAll(pointConstructMap, pointi)
     {
@@ -1516,20 +1341,11 @@ void Foam::distributedTriSurfaceMeshBugFix::findNearest
     // Important:force synchronised construction of indexing
     const globalIndex& triIndexer = globalTris();
 
-
-    // Initialise
-    // ~~~~~~~~~~
-
     info.setSize(samples.size());
     forAll(info, i)
     {
         info[i].setMiss();
     }
-
-
-
-    // Do any local queries
-    // ~~~~~~~~~~~~~~~~~~~~
 
     label nLocal = 0;
 

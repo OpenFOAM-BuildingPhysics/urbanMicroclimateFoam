@@ -847,12 +847,19 @@ int main(int argc, char *argv[])
                      solarLoadFineFaces[vectorId][fineFaceNo+faceI] = nVisibleFaceFacesListFINE[vectorId][fineFaceNo+faceI]*mag(cosPhi) * IDN_y[vectorId];                                                  
                 }
                                 
+                // Denominator as  the SUM of fine areas (Sigma|Sf_fine|)
+                scalar coarseFineArea = 0;
+                forAll(fineFaces,fineFaceI)
+                {
+                    coarseFineArea +=
+                        mesh.magSf().boundaryField()[patchIDall][fineFaces[fineFaceI]];
+                }
                 scalar nVisibleFaceFacesListFINE_avg = 0;
                 forAll(fineFaces,fineFaceI)
                 {
                     nVisibleFaceFacesListFINE_avg += (nVisibleFaceFacesListFINE[vectorId][fineFaceNo+fineFaces[fineFaceI]])
                                                     * (mesh.magSf().boundaryField()[patchIDall][fineFaces[fineFaceI]])
-                                                    / (coarseMesh.magSf().boundaryField()[patchIDall][j]);
+                                                    / (coarseFineArea + SMALL);
                 }                                  
                 
                 /////////////////////////////////////////////////////////////////////////
