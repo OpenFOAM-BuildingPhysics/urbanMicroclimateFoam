@@ -38,6 +38,7 @@ License
 #include "IOdictionary.H"
 #include "OSspecific.H"
 
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -220,7 +221,7 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
     tmp<scalarField> alphatNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("alphat"));
     tmp<scalarField> nutNbr = mapper.fromNeighbour(nbrPatch.lookupPatchField<volScalarField, scalar>("nut")); 
     
-    scalarField q_conv = (muair/Pr + alphatNbr())*cp*(TcNbr()-Tp)*deltaCoeff_(); 
+    scalarField q_conv = (muair/Pr + alphatNbr())*cp*(TcNbr()-Tp)*deltaCoeff_();
             
     scalarField pvsat_s = exp(6.58094e1-7.06627e3/Tp-5.976*log(Tp));
     scalarField pv_s = pvsat_s*exp((pc)/(rhol*Rv*Tp));
