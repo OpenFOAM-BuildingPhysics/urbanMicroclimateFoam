@@ -356,20 +356,10 @@ void CFDHAMsolidTemperatureCoupledMixedFvPatchScalarField::updateCoeffs()
             const fvPatch& vegiNbrPatch =
                 refCast<const fvMesh>(vegiMesh).boundary()[patchi];
 
-            //v8: constructed ad-hoc mappedPatchBase from solid to vegetation
-            //v8: const mappedPatchBase& mppVeg = mappedPatchBase(patch().patch(), vegiRegion, mpp.mode(), mpp.samplePatch(), 0);
-            //v8: qsNbr = vegiNbrPatch.lookupPatchField(...); mppVeg.distribute(qsNbr);
-            //v12: direct solid→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
-            //     fromNeighbour maps veg field directly onto solid patch faces
-            //     Constructed from a dictionary so the geometric-similarity check
-            //     runs with the same relaxed matchTolerance the case's mapped
-            //     patches use: the components constructor pins matchTolerance to
-            //     the 1e-4 default, which rejects solid<->vegetation patch pairs
-            //     on real urban geometry (patch centroids ~1% of scale apart).
             dictionary directMapperDict;
             directMapperDict.add("neighbourRegion", vegiRegion);
             directMapperDict.add("neighbourPatch", nbrPatchName);
-            directMapperDict.add("matchTolerance", 0.1);
+            directMapperDict.add("matchTolerance", 0.05);
             const mappedPatchBase directMapper
             (
                 patch().patch(),

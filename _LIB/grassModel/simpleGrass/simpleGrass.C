@@ -232,19 +232,10 @@ void Foam::grass::simpleGrass::calculate
                 const fvPatch& vegiNbrPatch =
                     refCast<const fvMesh>(vegiMesh).boundary()[vegiPatchID];
 
-                //v8: const mappedPatchBase& mpp = refCast<const mappedPatchBase>(thisPatch.patch());
-                //v8: const mappedPatchBase& mppVeg = mappedPatchBase(thisPatch.patch(), vegiRegion, mpp.mode(), thisPatch.name(), 0);
-                //v8: qs = vegiNbrPatch.lookupPatchField<...>("qs"); mppVeg.distribute(qs);
-                //v12: direct air→veg mapping via ad-hoc mappedPatchBase (equivalent to v8)
-                //     fromNeighbour maps veg field directly onto air patch faces
-                // Constructed from a dictionary so the geometric-similarity
-                // check runs with a relaxed matchTolerance (the components
-                // constructor pins it to the 1e-4 default, which rejects
-                // air<->vegetation patch pairs on real urban geometry).
                 dictionary directMapperDict;
                 directMapperDict.add("neighbourRegion", "vegetation");
                 directMapperDict.add("neighbourPatch", thisPatch.name());
-                directMapperDict.add("matchTolerance", 0.1);
+                directMapperDict.add("matchTolerance", 0.05);
                 const mappedPatchBase directMapper
                 (
                     thisPatch.patch(),
